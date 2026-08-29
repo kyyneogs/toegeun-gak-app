@@ -1,0 +1,4 @@
+stop_id,stop_name,stop_lat,stop_lon
+STOP_J,정류장,37.39,127.11
+STOP_P,판교역,37.394,127.111
+STOP_G,강남역,37.497,127.027

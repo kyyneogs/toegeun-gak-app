@@ -1,0 +1,40 @@
+:root {
+	color-scheme: light;
+	--color-bg: #f2f2f7;
+	--color-card: #ffffff;
+	--color-grouped: #f2f2f7;
+	--color-text: #1c1c1e;
+	--color-label: #8e8e93;
+	--color-secondary-label: #636366;
+	--color-accent: #007aff;
+	--color-accent-pressed: #0066d6;
+	--color-separator: #c6c6c8;
+	--color-fill: #e5e5ea;
+	--color-fill-strong: #d1d1d6;
+	--color-danger: #ff3b30;
+	--color-success: #34c759;
+	--color-overlay: rgb(0 0 0 / 0.04);
+	--radius-card: 16px;
+	--radius-control: 12px;
+	--radius-button: 14px;
+	--radius-pill: 999px;
+	--space-1: 4px;
+	--space-2: 8px;
+	--space-3: 12px;
+	--space-4: 16px;
+	--space-5: 20px;
+	--space-6: 24px;
+	--space-8: 32px;
+	--font-sans:
+		-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', system-ui,
+		sans-serif;
+	--shadow-card: 0 1px 2px rgb(0 0 0 / 0.04);
+	--hero-size: clamp(56px, 16vw, 80px);
+	--app-max-width: 430px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	:root {
+		--motion: 0ms;
+	}
+}
