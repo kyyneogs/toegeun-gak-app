@@ -55,6 +55,71 @@ describe('HttpRouteProvider', () => {
 		}
 	});
 
+	it('maps 404 route-not-found with the server message', async () => {
+		const fetchImpl: typeof fetch = async () =>
+			new Response(
+				JSON.stringify({
+					code: ERROR_CODES.ROUTE_NOT_FOUND,
+					message: '이용 가능한 경로 없음',
+					routes: []
+				}),
+				{ status: 200, headers: { 'Content-Type': 'application/json' } }
+			);
+
+		try {
+			await new HttpRouteProvider(fetchImpl).findRoutes(REQUEST);
+			expect.fail('should throw');
+		} catch (error) {
+			expect((error as AppError).code).toBe(ERROR_CODES.ROUTE_NOT_FOUND);
+			expect((error as Error).message).toBe('이용 가능한 경로 없음');
+		}
+	});
+
+	it('reuses the live route from the scheduled search instead of posting twice', async () => {
+		let posts = 0;
+		const fetchImpl: typeof fetch = async () => {
+			posts += 1;
+			return new Response(
+				JSON.stringify({
+					liveRoute: {
+						provider: 'kakao',
+						routeId: 'live',
+						totalTimeSeconds: 1,
+						movingTimeSeconds: 1,
+						waitingTimeSeconds: 0,
+						walkingTimeSeconds: 0,
+						transferCount: 0,
+						departureAt: REQUEST.departureAt.toISOString(),
+						arrivalAt: REQUEST.departureAt.toISOString(),
+						sections: []
+					},
+					routes: [
+						{
+							provider: 'gtfs',
+							routeId: 'gtfs_0',
+							totalTimeSeconds: 600,
+							movingTimeSeconds: 600,
+							waitingTimeSeconds: 0,
+							walkingTimeSeconds: 120,
+							transferCount: 0,
+							departureAt: REQUEST.departureAt.toISOString(),
+							arrivalAt: REQUEST.departureAt.toISOString(),
+							sections: []
+						}
+					]
+				}),
+				{ status: 200, headers: { 'Content-Type': 'application/json' } }
+			);
+		};
+
+		const provider = new HttpRouteProvider(fetchImpl);
+		await provider.findRoutes(REQUEST);
+		const live = await provider.findLiveRoute(REQUEST);
+
+		expect(posts).toBe(1);
+		expect(live?.provider).toBe('kakao');
+	});
+
 	it('maps 429 without exposing the response body', async () => {
 		const fetchImpl: typeof fetch = async () =>
 			new Response(JSON.stringify({ message: 'secret quota' }), { status: 429 });

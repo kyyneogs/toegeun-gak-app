@@ -5,14 +5,14 @@ import { ERROR_CODES } from '$lib/constants/errors';
 import { AppError } from '$lib/domain/errors';
 import type { TransitRoute } from '$lib/domain/route/route';
 import type { RouteProvider } from '$lib/ports/route-provider';
-import { addMinutes, combineLocalDateAndClock, formatClock, toIso } from '$lib/utils/time';
+import { combineLocalDateAndClock, formatClock, toIso } from '$lib/utils/time';
 import { describe, expect, it } from 'vitest';
 
 const DAY = new Date(2026, 7, 29);
 
 function makeRoute(clock: string, totalMinutes: number): TransitRoute {
-	const departure = combineLocalDateAndClock(clock, DAY);
-	const arrival = addMinutes(departure, totalMinutes);
+	const departure = combineLocalDateAndClock('18:00', DAY);
+	const arrival = combineLocalDateAndClock(clock, DAY);
 
 	return {
 		provider: 'scripted',
@@ -24,44 +24,33 @@ function makeRoute(clock: string, totalMinutes: number): TransitRoute {
 		transferCount: 0,
 		departureAt: toIso(departure),
 		arrivalAt: toIso(arrival),
-		sections: []
+		sections: [],
+		scheduleSource: 'gtfs'
 	};
 }
 
 class ScriptedRouteProvider implements RouteProvider {
-	inFlight = 0;
-	maxInFlight = 0;
-	clocks: string[] = [];
+	calls = 0;
 
 	constructor(
-		private readonly table: Record<string, TransitRoute[]>,
-		private readonly rateLimitAt?: string
+		private readonly routes: TransitRoute[],
+		private readonly rateLimit = false
 	) {}
 
-	async findRoutes(request: { departureAt: Date }): Promise<TransitRoute[]> {
-		this.inFlight += 1;
-		this.maxInFlight = Math.max(this.maxInFlight, this.inFlight);
-		const clock = formatClock(request.departureAt);
-		this.clocks.push(clock);
-		await delay(5);
-		this.inFlight -= 1;
+	async findRoutes(): Promise<TransitRoute[]> {
+		this.calls += 1;
 
-		if (this.rateLimitAt && clock === this.rateLimitAt) {
+		if (this.rateLimit) {
 			throw new AppError(ERROR_CODES.ROUTE_PROVIDER_RATE_LIMIT);
 		}
 
-		return this.table[clock] ?? [];
+		return this.routes;
 	}
 }
 
-async function recommendWith(
-	provider: RouteProvider,
-	resolveSlotIntervalMinutes?: () => Promise<number>
-) {
+async function recommendWith(provider: RouteProvider) {
 	const tripService = new TripApplicationService();
-	const recommendationService = new RecommendationApplicationService(provider, {
-		resolveSlotIntervalMinutes
-	});
+	const recommendationService = new RecommendationApplicationService(provider);
 	const trip = await tripService.createTrip({
 		origin: COMPANY_PLACE,
 		destination: GANGNAM_STATION,
@@ -73,33 +62,34 @@ async function recommendWith(
 }
 
 describe('RecommendationApplicationService', () => {
-	it('looks up slots one at a time', async () => {
-		const provider = new ScriptedRouteProvider({
-			'18:00': [makeRoute('18:00', 40)]
-		});
+	it('looks up timed routes once', async () => {
+		const provider = new ScriptedRouteProvider([makeRoute('18:40', 40)]);
 
 		await recommendWith(provider);
 
-		expect(provider.maxInFlight).toBe(1);
+		expect(provider.calls).toBe(1);
 	});
 
-	it('recommends from slots collected before a rate limit', async () => {
-		const provider = new ScriptedRouteProvider(
-			{
-				'18:00': [makeRoute('18:00', 50)],
-				'18:05': [makeRoute('18:05', 30)]
-			},
-			'18:10'
-		);
-
+	it('recommends the route that arrives first', async () => {
+		const provider = new ScriptedRouteProvider([makeRoute('19:20', 80), makeRoute('18:40', 40)]);
 		const result = await recommendWith(provider);
 
-		expect(formatClock(new Date(result.recommended.departureAt))).toBe('18:05');
-		expect(provider.clocks.includes('18:15')).toBe(false);
+		expect(formatClock(new Date(result.recommended.expectedArrivalAt))).toBe('18:40');
+		expect(result.recommended.route.routeId).toBe('route_18:40');
 	});
 
-	it('throws rate-limit when no slot succeeded before 429', async () => {
-		const provider = new ScriptedRouteProvider({}, '18:00');
+	it('keeps the first route when arrivals are equal', async () => {
+		const first = makeRoute('18:40', 40);
+		first.routeId = 'first';
+		const second = makeRoute('18:40', 40);
+		second.routeId = 'second';
+		const result = await recommendWith(new ScriptedRouteProvider([first, second]));
+
+		expect(result.recommended.route.routeId).toBe('first');
+	});
+
+	it('throws rate-limit from the single lookup', async () => {
+		const provider = new ScriptedRouteProvider([], true);
 
 		try {
 			await recommendWith(provider);
@@ -110,44 +100,17 @@ describe('RecommendationApplicationService', () => {
 		}
 	});
 
-	it('uses 10-minute slots when the resolver returns a custom interval', async () => {
-		const provider = new ScriptedRouteProvider({
-			'18:00': [makeRoute('18:00', 40)]
-		});
-
-		await recommendWith(provider, async () => 10);
-
-		expect(provider.clocks).toEqual([
-			'18:00',
-			'18:10',
-			'18:20',
-			'18:30',
-			'18:40',
-			'18:50',
-			'19:00'
-		]);
-	});
-
-	it('attaches a live route without mixing it into slot scores', async () => {
+	it('does not use a live Kakao snapshot for selection', async () => {
 		const live = makeRoute('17:50', 40);
 		live.provider = 'kakao';
 		const provider: RouteProvider = {
 			findLiveRoute: async () => live,
-			findRoutes: async (request) => {
-				const clock = formatClock(request.departureAt);
-				return [makeRoute(clock, 30)];
-			}
+			findRoutes: async () => [makeRoute('18:40', 40)]
 		};
 
 		const result = await recommendWith(provider);
 
-		expect(result.liveRoute?.provider).toBe('kakao');
+		expect(result.liveRoute).toBeUndefined();
 		expect(result.recommended.route.provider).toBe('scripted');
 	});
 });
-
-function delay(ms: number): Promise<void> {
-	return new Promise((resolve) => {
-		setTimeout(resolve, ms);
-	});
-}

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { RouteSection } from '$lib/domain/route/route';
-	import { formatDurationMinutes, fromIso, secondsBetween } from '$lib/utils/time';
+	import { formatClock, formatDurationMinutes, fromIso, secondsBetween } from '$lib/utils/time';
 
 	interface Props {
 		sections: RouteSection[];
@@ -27,6 +27,7 @@
 			<div class="rail"></div>
 			<div class="copy">
 				<p class="kind">{labels[section.type]} {formatDurationMinutes(sectionDuration(section))}</p>
+				<p class="when">{formatClock(fromIso(section.departureAt))}</p>
 				<p class="places">
 					{section.startPlaceName}
 					{#if section.endPlaceName !== section.startPlaceName}
@@ -87,6 +88,14 @@
 		margin: 4px 0 0;
 		color: var(--color-secondary-label);
 		font-size: 15px;
+	}
+
+	.when {
+		margin: 4px 0 0;
+		color: var(--color-text);
+		font-size: 15px;
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.total {

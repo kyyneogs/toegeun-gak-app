@@ -27,7 +27,7 @@ export const KAKAO_ROUTE_KEY_CONFIGURED_MESSAGE =
 	'Kakao 대중교통 경로가 설정되어 있습니다. 실제 경로 검색은 설정에서 다시 확인하세요.';
 
 export const KAKAO_ROUTE_CONNECTED_MESSAGE =
-	'Kakao 대중교통 경로에 연결되었습니다. 지금 찾은 경로는 실시간으로 표시하고, 퇴근각은 추정 배차입니다.';
+	'Kakao 대중교통 경로에 연결되었습니다. 퇴근각은 GTFS 정적 시각표입니다.';
 
 export const KAKAO_ROUTE_FAILURE_MESSAGE =
 	'Kakao 대중교통 경로에 연결하지 못했습니다. REST API 키와 카카오맵 사용 설정을 확인하세요.';
@@ -35,21 +35,11 @@ export const KAKAO_ROUTE_FAILURE_MESSAGE =
 export const KAKAO_ROUTE_NETWORK_FAILURE_MESSAGE =
 	'Kakao 서버에 연결하지 못했습니다. 네트워크를 확인하세요.';
 
-export const KAKAO_LIVE_ROUTE_COPY =
-	'Kakao가 지금 찾아 준 경로입니다. 버스 실시간 위치가 아닙니다.';
-
-export const KAKAO_SCHEDULE_ROUTE_COPY = '추정 배차입니다. 공식 시각표가 아닙니다.';
-
 export const KAKAO_GTFS_ROUTE_COPY = 'GTFS 정적 시각표입니다. 실시간 도착이 아닙니다.';
 
 export function scheduleRouteCopy(source: ScheduleSource | undefined): string {
-	return source === 'gtfs' ? KAKAO_GTFS_ROUTE_COPY : KAKAO_SCHEDULE_ROUTE_COPY;
-}
-
-const KAKAO_SCHEDULE_EXPLANATION_PREFIX = '지금 경로는 Kakao 탐색 결과이고, 이 퇴근각은 ';
-
-export function scheduleExplanationCopy(source: ScheduleSource | undefined): string {
-	return `${KAKAO_SCHEDULE_EXPLANATION_PREFIX}${scheduleRouteCopy(source)}`;
+	void source;
+	return KAKAO_GTFS_ROUTE_COPY;
 }
 
 export function isKakaoRestKeyConfigured(key: string | undefined): boolean {

@@ -49,10 +49,24 @@ export async function POST({ request }) {
 	try {
 		const gtfsDir = env.GTFS_DIR?.trim() ?? '';
 		const provider = getServerKakaoRouteProvider(restKey, gtfsDir);
-		const [liveRoute, routes] = await Promise.all([
-			provider.findLiveRoute(routeRequest),
-			provider.findRoutes(routeRequest)
-		]);
+		const liveRoute = await provider.findLiveRoute(routeRequest);
+		let routes;
+
+		try {
+			routes = await provider.findRoutes(routeRequest);
+		} catch (cause) {
+			if (isAppError(cause) && cause.code === ERROR_CODES.ROUTE_NOT_FOUND) {
+				return json({
+					liveRoute,
+					routes: [],
+					code: cause.code,
+					message: cause.message
+				});
+			}
+
+			throw cause;
+		}
+
 		return json({ liveRoute, routes });
 	} catch (cause) {
 		console.error('Transit search failed', cause);

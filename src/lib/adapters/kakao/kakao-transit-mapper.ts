@@ -3,6 +3,7 @@ import type {
 	KakaoTransitStep,
 	KakaoTransitResponse
 } from '$lib/adapters/kakao/kakao-transit-document';
+import type { TopologyRoute } from '$lib/domain/optimization/types';
 import type { RouteLegTemplate, RouteTemplate } from '$lib/domain/route/template';
 
 const STEP_TYPE: Record<string, RouteLegTemplate['type']> = {
@@ -11,23 +12,46 @@ const STEP_TYPE: Record<string, RouteLegTemplate['type']> = {
 	SUBWAY: 'subway'
 };
 
-export function pickKakaoTransitRoute(payload: KakaoTransitResponse): KakaoTransitRoute | null {
-	if (payload.status !== 'OK' || !payload.routes || payload.routes.length === 0) {
+export function mapKakaoRoutesToTopologies(
+	payload: KakaoTransitResponse,
+	originName: string,
+	destinationName: string
+): TopologyRoute[] {
+	if (payload.status !== 'OK' || !payload.routes) {
+		return [];
+	}
+
+	const topologies: TopologyRoute[] = [];
+
+	for (const route of payload.routes) {
+		const topology = mapKakaoRouteToTopology(route, originName, destinationName);
+
+		if (topology) {
+			topologies.push(topology);
+		}
+	}
+
+	return topologies;
+}
+
+export function mapKakaoRouteToLiveTemplate(
+	payload: KakaoTransitResponse,
+	originName: string,
+	destinationName: string
+): RouteTemplate | null {
+	if (payload.status !== 'OK' || !payload.routes) {
 		return null;
 	}
 
-	const ranked = [...payload.routes].sort((left, right) => {
-		const leftTime = left.properties?.totalTime ?? Number.POSITIVE_INFINITY;
-		const rightTime = right.properties?.totalTime ?? Number.POSITIVE_INFINITY;
+	for (const route of payload.routes) {
+		const template = mapKakaoRouteToTemplate(route, originName, destinationName);
 
-		if (leftTime !== rightTime) {
-			return leftTime - rightTime;
+		if (template) {
+			return template;
 		}
+	}
 
-		return (left.properties?.transfers ?? 0) - (right.properties?.transfers ?? 0);
-	});
-
-	return ranked[0] ?? null;
+	return null;
 }
 
 export function mapKakaoRouteToTemplate(
@@ -39,7 +63,7 @@ export function mapKakaoRouteToTemplate(
 	const legs: RouteLegTemplate[] = [];
 
 	for (const [index, step] of steps.entries()) {
-		const leg = mapKakaoStep(step, index, steps.length, originName, destinationName);
+		const leg = mapKakaoLiveStep(step, index, steps.length, originName, destinationName);
 
 		if (!leg) {
 			return null;
@@ -60,7 +84,106 @@ export function mapKakaoRouteToTemplate(
 	};
 }
 
-function mapKakaoStep(
+function mapKakaoRouteToTopology(
+	route: KakaoTransitRoute,
+	originName: string,
+	destinationName: string
+): TopologyRoute | null {
+	const steps = route.steps ?? [];
+	const segments: TopologyRoute['segments'] = [];
+
+	for (const [index, step] of steps.entries()) {
+		const segment = mapKakaoTopologyStep(step, index, steps.length, originName, destinationName);
+
+		if (segment === 'skip') {
+			continue;
+		}
+
+		if (!segment) {
+			return null;
+		}
+
+		segments.push(segment);
+	}
+
+	if (segments.length === 0) {
+		return null;
+	}
+
+	return { segments };
+}
+
+function mapKakaoTopologyStep(
+	step: KakaoTransitStep,
+	index: number,
+	stepCount: number,
+	originName: string,
+	destinationName: string
+): TopologyRoute['segments'][number] | 'skip' | null {
+	const properties = step.properties;
+	const type = properties?.type ? STEP_TYPE[properties.type] : undefined;
+
+	if (!type) {
+		return null;
+	}
+
+	const places = placeNames(step, index, stepCount, originName, destinationName);
+
+	if (type === 'walk') {
+		const duration = properties?.time;
+
+		if (!duration || duration <= 0) {
+			return 'skip';
+		}
+
+		return {
+			type: 'WALK',
+			duration,
+			startPlaceName: places.startPlaceName,
+			endPlaceName: places.endPlaceName
+		};
+	}
+
+	if (!places.firstStop || !places.lastStop) {
+		return null;
+	}
+
+	if (type === 'bus') {
+		const candidateRouteIds = (properties?.vehicles ?? [])
+			.map((vehicle) => vehicle.name?.trim())
+			.filter((name): name is string => Boolean(name));
+
+		if (candidateRouteIds.length === 0) {
+			return null;
+		}
+
+		return {
+			type: 'BUS',
+			stopId: places.firstStop,
+			alightStopId: places.lastStop,
+			candidateRouteIds,
+			startPlaceName: places.startPlaceName,
+			endPlaceName: places.endPlaceName
+		};
+	}
+
+	const lineId = properties?.vehicles?.[0]?.name?.trim();
+
+	if (!lineId) {
+		return null;
+	}
+
+	return {
+		type: 'SUBWAY',
+		stopId: places.firstStop,
+		alightStopId: places.lastStop,
+		candidateRouteIds: [lineId],
+		startPlaceName: places.startPlaceName,
+		endPlaceName: places.endPlaceName
+	};
+}
+
+function mapKakaoLiveStep(
 	step: KakaoTransitStep,
 	index: number,
 	stepCount: number,
@@ -75,23 +198,36 @@ function mapKakaoStep(
 		return null;
 	}
 
-	const stops = properties.stops ?? [];
-	const firstStop = stops[0]?.name?.trim();
-	const lastStop = stops[stops.length - 1]?.name?.trim();
-	const vehicle = properties.vehicles?.[0];
-	const startPlaceName = type === 'walk' && index === 0 ? originName : firstStop || originName;
-	const endPlaceName =
-		type === 'walk' && index === stepCount - 1 ? destinationName : lastStop || destinationName;
+	const places = placeNames(step, index, stepCount, originName, destinationName);
+	const vehicle = properties?.vehicles?.[0];
 
 	return {
 		type,
 		durationSeconds,
-		startPlaceName,
-		endPlaceName,
+		startPlaceName: places.startPlaceName,
+		endPlaceName: places.endPlaceName,
 		routeId: vehicle?.name,
 		routeName: vehicleName(vehicle?.type, vehicle?.name),
 		vehicleType: type === 'walk' ? undefined : type
 	};
+}
+
+function placeNames(
+	step: KakaoTransitStep,
+	index: number,
+	stepCount: number,
+	originName: string,
+	destinationName: string
+) {
+	const type = step.properties?.type ? STEP_TYPE[step.properties.type] : undefined;
+	const stops = step.properties?.stops ?? [];
+	const firstStop = stops[0]?.name?.trim();
+	const lastStop = stops[stops.length - 1]?.name?.trim();
+	const startPlaceName = type === 'walk' && index === 0 ? originName : firstStop || originName;
+	const endPlaceName =
+		type === 'walk' && index === stepCount - 1 ? destinationName : lastStop || destinationName;
+
+	return { firstStop, lastStop, startPlaceName, endPlaceName };
 }
 
 function vehicleName(kind: string | undefined, name: string | undefined): string | undefined {

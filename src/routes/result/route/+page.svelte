@@ -2,14 +2,16 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import RouteTimeline from '$lib/components/RouteTimeline.svelte';
-	import { KAKAO_LIVE_ROUTE_COPY, scheduleRouteCopy } from '$lib/constants/kakao';
+	import { scheduleRouteCopy } from '$lib/constants/kakao';
+	import { STAND_UP_BOARD_LABEL, STAND_UP_WALK_LABEL } from '$lib/constants/recommendation';
 	import { tripSession } from '$lib/stores/trip-session.svelte';
+	import { standUpStartsWithWalk } from '$lib/utils/route-label';
 	import { formatClock, fromIso } from '$lib/utils/time';
 
-	const liveRoute = $derived(tripSession.result?.liveRoute ?? null);
-	const predictedRoute = $derived(tripSession.result?.recommended.route ?? null);
-	const showingLive = $derived(tripSession.routeDetailKind === 'live' && Boolean(liveRoute));
-	const route = $derived(showingLive ? liveRoute : predictedRoute);
+	const route = $derived(tripSession.result?.recommended.route ?? null);
+	const standUpLabel = $derived(
+		route && standUpStartsWithWalk(route.sections) ? STAND_UP_WALK_LABEL : STAND_UP_BOARD_LABEL
+	);
 
 	$effect(() => {
 		if (!route) {
@@ -25,15 +27,15 @@
 </header>
 
 {#if route && tripSession.result}
-	{#if showingLive}
-		<p class="large-title">실시간 경로</p>
-		<p class="status-copy">{KAKAO_LIVE_ROUTE_COPY}</p>
-	{:else}
-		<p class="large-title">
-			{formatClock(fromIso(tripSession.result.recommended.departureAt))} 출발
-		</p>
-		<p class="status-copy">{scheduleRouteCopy(tripSession.result.scheduleSource)}</p>
-	{/if}
+	<p class="large-title">
+		{formatClock(fromIso(tripSession.result.recommended.departureAt))}
+	</p>
+	<p class="status-copy">{standUpLabel}</p>
+	<p class="status-copy">
+		{formatClock(fromIso(tripSession.result.recommended.expectedArrivalAt))} 도착 · {scheduleRouteCopy(
+			tripSession.result.scheduleSource
+		)}
+	</p>
 	<div class="card body">
 		<RouteTimeline sections={route.sections} totalTimeSeconds={route.totalTimeSeconds} />
 	</div>

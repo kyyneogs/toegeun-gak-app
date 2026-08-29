@@ -1,0 +1,2 @@
+export const WALKING_SPEED_METERS_PER_SECOND = 1.2;
+export const EARTH_RADIUS_METERS = 6_371_000;

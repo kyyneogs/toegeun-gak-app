@@ -1,14 +1,16 @@
 import { existsSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { forEachCsvRow } from '$lib/adapters/gtfs/gtfs-csv-reader';
+import { loadStopTimesForTrips } from '$lib/adapters/gtfs/gtfs-stop-times';
 import {
 	extractRouteShortName,
 	isStopNameMatch,
 	normalizeStopName
 } from '$lib/adapters/gtfs/gtfs-match';
-import type { TimetableDeparture, TimetableLookup } from '$lib/domain/route/timetable';
-import type { TimetablePort } from '$lib/ports/timetable-port';
+import type { TripChoice } from '$lib/domain/optimization/types';
+import type { NextTripQuery, TimetablePort } from '$lib/ports/timetable-port';
 import { addSeconds, startOfLocalDay } from '$lib/utils/time';
+import type { GeoPoint } from '$lib/utils/geo';
 
 export const GTFS_REQUIRED_FILES = [
 	'routes.txt',
@@ -18,7 +20,7 @@ export const GTFS_REQUIRED_FILES = [
 	'calendar.txt'
 ] as const;
 
-const GTFS_CLOCK_PATTERN = /^(\d{1,3}):([0-5]\d):([0-5]\d)$/;
+const CALENDAR_DATES_FILE = 'calendar_dates.txt';
 const CALENDAR_DAY_COLUMNS = [
 	'sunday',
 	'monday',
@@ -28,6 +30,8 @@ const CALENDAR_DAY_COLUMNS = [
 	'friday',
 	'saturday'
 ] as const;
+const EXCEPTION_ADDED = '1';
+const EXCEPTION_REMOVED = '2';
 
 interface CalendarService {
 	startDate: string;
@@ -38,6 +42,14 @@ interface CalendarService {
 interface TripRecord {
 	tripId: string;
 	serviceId: string;
+	routeId: string;
+}
+
+interface StopTimePoint {
+	stopId: string;
+	sequence: number;
+	arrivalSeconds: number;
+	departureSeconds: number;
 }
 
 interface GtfsIndex {
@@ -46,31 +58,61 @@ interface GtfsIndex {
 	stopIdsByNormalizedName: Map<string, string[]>;
 	tripsByRouteId: Map<string, TripRecord[]>;
 	calendarByServiceId: Map<string, CalendarService>;
+	calendarDateExceptions: Map<string, string>;
+	coordinatesByStopId: Map<string, GeoPoint>;
 }
 
 export class GtfsTimetable implements TimetablePort {
 	private indexPromise: Promise<GtfsIndex> | null = null;
-	private readonly stopTimesByTripStop = new Map<string, number[]>();
+	private readonly stopTimesByTrip = new Map<string, StopTimePoint[]>();
 	private readonly loadedTripIds = new Set<string>();
+	private readonly queuedTripIds = new Set<string>();
+	private stopTimesLoad: Promise<void> | null = null;
 
 	constructor(private readonly directory: string) {}
 
-	async nextDeparture(query: TimetableLookup): Promise<TimetableDeparture | null> {
-		const shortName = extractRouteShortName(query.routeName);
-
-		if (!shortName || !query.stopName.trim()) {
-			return null;
-		}
-
+	async prepare(routeIds: string[], serviceDate: Date): Promise<void> {
 		const index = await this.ensureIndex();
-		const routeIds = index.routeIdsByShortName.get(shortName) ?? [];
-		const stopIds = matchStopIds(index, query.stopName);
+		const tripIds: string[] = [];
 
-		if (routeIds.length === 0 || stopIds.length === 0) {
+		for (const routeId of routeIds) {
+			const gtfsRouteIds = resolveRouteIds(index, routeId);
+			for (const trip of collectActiveTrips(index, gtfsRouteIds, serviceDate)) {
+				tripIds.push(trip.tripId);
+			}
+		}
+
+		await this.ensureStopTimes(tripIds);
+	}
+
+	async findStopCoordinates(stopName: string): Promise<GeoPoint[]> {
+		const index = await this.ensureIndex();
+		const points: GeoPoint[] = [];
+
+		for (const stopId of matchStopIds(index, stopName)) {
+			const point = index.coordinatesByStopId.get(stopId);
+
+			if (point) {
+				points.push(point);
+			}
+		}
+
+		return points;
+	}
+
+	async findNextTrip(query: NextTripQuery): Promise<TripChoice | null> {
+		const index = await this.ensureIndex();
+		const routeIds = resolveRouteIds(index, query.routeId);
+		const boardStopIds = matchStopIds(index, query.boardStopName);
+		const alightStopIds = matchStopIds(index, query.alightStopName);
+
+		if (routeIds.length === 0 || boardStopIds.length === 0 || alightStopIds.length === 0) {
 			return null;
 		}
 
-		const activeTrips = collectActiveTrips(index, routeIds, query.after);
+		const boardStops = new Set(boardStopIds);
+		const alightStops = new Set(alightStopIds);
+		const activeTrips = collectActiveTrips(index, routeIds, query.serviceDate);
 
 		if (activeTrips.length === 0) {
 			return null;
@@ -78,32 +120,38 @@ export class GtfsTimetable implements TimetablePort {
 
 		await this.ensureStopTimes(activeTrips.map((trip) => trip.tripId));
 
-		const afterSeconds = secondsFromMidnight(query.after);
-		let bestSeconds: number | null = null;
+		const afterSeconds = secondsSinceServiceStart(query.after, query.serviceDate);
+		let best: { trip: TripRecord; boardSeconds: number; alightSeconds: number } | null = null;
 
 		for (const trip of activeTrips) {
-			for (const stopId of stopIds) {
-				const times = this.stopTimesByTripStop.get(tripStopKey(trip.tripId, stopId));
+			const points = this.stopTimesByTrip.get(trip.tripId);
 
-				if (!times) {
-					continue;
-				}
+			if (!points) {
+				continue;
+			}
 
-				for (const timeSeconds of times) {
-					if (timeSeconds >= afterSeconds && (bestSeconds === null || timeSeconds < bestSeconds)) {
-						bestSeconds = timeSeconds;
-					}
-				}
+			const next = nextBoardAndAlight(points, boardStops, alightStops, afterSeconds);
+
+			if (!next) {
+				continue;
+			}
+
+			if (!best || next.boardSeconds < best.boardSeconds) {
+				best = { trip, boardSeconds: next.boardSeconds, alightSeconds: next.alightSeconds };
 			}
 		}
 
-		if (bestSeconds === null) {
+		if (!best) {
 			return null;
 		}
 
+		const serviceStart = startOfLocalDay(query.serviceDate);
+
 		return {
-			departureAt: addSeconds(startOfLocalDay(query.after), bestSeconds),
-			source: 'gtfs'
+			routeId: query.routeId,
+			tripId: best.trip.tripId,
+			boardTime: addSeconds(serviceStart, best.boardSeconds),
+			alightTime: addSeconds(serviceStart, best.alightSeconds)
 		};
 	}
 
@@ -119,34 +167,73 @@ export class GtfsTimetable implements TimetablePort {
 	}
 
 	private async ensureStopTimes(tripIds: string[]): Promise<void> {
-		const missing = tripIds.filter((tripId) => !this.loadedTripIds.has(tripId));
+		for (const tripId of tripIds) {
+			if (!this.loadedTripIds.has(tripId)) {
+				this.queuedTripIds.add(tripId);
+			}
+		}
+
+		if (this.queuedTripIds.size === 0 && !this.stopTimesLoad) {
+			return;
+		}
+
+		await Promise.resolve();
+
+		if (!this.stopTimesLoad) {
+			this.stopTimesLoad = this.flushStopTimesQueue().finally(() => {
+				this.stopTimesLoad = null;
+			});
+		}
+
+		await this.stopTimesLoad;
+
+		const stillMissing = tripIds.filter((tripId) => !this.loadedTripIds.has(tripId));
+
+		if (stillMissing.length > 0) {
+			await this.ensureStopTimes(stillMissing);
+		}
+	}
+
+	private async flushStopTimesQueue(): Promise<void> {
+		const missing = [...this.queuedTripIds].filter((tripId) => !this.loadedTripIds.has(tripId));
+		this.queuedTripIds.clear();
 
 		if (missing.length === 0) {
 			return;
 		}
 
-		const missingSet = new Set(missing);
-
-		await forEachCsvRow(join(this.directory, 'stop_times.txt'), (row) => {
-			if (!missingSet.has(row.trip_id)) {
-				return;
-			}
-
-			const seconds = parseGtfsClockToSeconds(row.departure_time || row.arrival_time);
-
-			if (seconds === null) {
-				return;
-			}
-
-			const key = tripStopKey(row.trip_id, row.stop_id);
-			const times = this.stopTimesByTripStop.get(key) ?? [];
-			times.push(seconds);
-			this.stopTimesByTripStop.set(key, times);
-		});
+		const startedAt = Date.now();
+		await loadStopTimesForTrips(
+			join(this.directory, 'stop_times.txt'),
+			new Set(missing),
+			this.stopTimesByTrip
+		);
 
 		for (const tripId of missing) {
 			this.loadedTripIds.add(tripId);
 		}
+
+		console.info('GTFS stop_times indexed', {
+			trips: missing.length,
+			ms: Date.now() - startedAt
+		});
+	}
+}
+
+export class EmptyTimetable implements TimetablePort {
+	async prepare(_routeIds: string[], _serviceDate: Date): Promise<void> {
+		void _routeIds;
+		void _serviceDate;
+	}
+
+	async findNextTrip(_query: NextTripQuery): Promise<TripChoice | null> {
+		void _query;
+		return null;
+	}
+
+	async findStopCoordinates(_stopName: string): Promise<GeoPoint[]> {
+		void _stopName;
+		return [];
 	}
 }
 
@@ -204,6 +291,8 @@ async function loadGtfsIndex(directory: string): Promise<GtfsIndex> {
 	const stopIdsByNormalizedName = new Map<string, string[]>();
 	const tripsByRouteId = new Map<string, TripRecord[]>();
 	const calendarByServiceId = new Map<string, CalendarService>();
+	const calendarDateExceptions = new Map<string, string>();
+	const coordinatesByStopId = new Map<string, GeoPoint>();
 
 	await forEachCsvRow(join(directory, 'routes.txt'), (row) => {
 		const shortName = extractRouteShortName(row.route_short_name ?? '');
@@ -226,6 +315,13 @@ async function loadGtfsIndex(directory: string): Promise<GtfsIndex> {
 
 		pushMapValue(stopIdsByExactName, row.stop_name.trim(), row.stop_id);
 		pushMapValue(stopIdsByNormalizedName, normalizeStopName(row.stop_name), row.stop_id);
+
+		const latitude = Number.parseFloat(row.stop_lat ?? '');
+		const longitude = Number.parseFloat(row.stop_lon ?? '');
+
+		if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+			coordinatesByStopId.set(row.stop_id, { latitude, longitude });
+		}
 	});
 
 	await forEachCsvRow(join(directory, 'calendar.txt'), (row) => {
@@ -240,13 +336,31 @@ async function loadGtfsIndex(directory: string): Promise<GtfsIndex> {
 		});
 	});
 
+	const calendarDatesPath = join(directory, CALENDAR_DATES_FILE);
+
+	if (existsSync(calendarDatesPath)) {
+		await forEachCsvRow(calendarDatesPath, (row) => {
+			if (
+				!row.service_id ||
+				!row.date ||
+				(row.exception_type !== EXCEPTION_ADDED && row.exception_type !== EXCEPTION_REMOVED)
+			) {
+				return;
+			}
+
+			calendarDateExceptions.set(calendarDateKey(row.service_id, row.date), row.exception_type);
+		});
+	} else {
+		console.info('GTFS calendar_dates.txt is absent; using calendar.txt only', { directory });
+	}
+
 	await forEachCsvRow(join(directory, 'trips.txt'), (row) => {
 		if (!row.route_id || !row.trip_id || !row.service_id) {
 			return;
 		}
 
 		const trips = tripsByRouteId.get(row.route_id) ?? [];
-		trips.push({ tripId: row.trip_id, serviceId: row.service_id });
+		trips.push({ tripId: row.trip_id, serviceId: row.service_id, routeId: row.route_id });
 		tripsByRouteId.set(row.route_id, trips);
 	});
 
@@ -255,8 +369,28 @@ async function loadGtfsIndex(directory: string): Promise<GtfsIndex> {
 		stopIdsByExactName,
 		stopIdsByNormalizedName,
 		tripsByRouteId,
-		calendarByServiceId
+		calendarByServiceId,
+		calendarDateExceptions,
+		coordinatesByStopId
 	};
+}
+
+function resolveRouteIds(index: GtfsIndex, candidateRouteId: string): string[] {
+	const shortName = extractRouteShortName(candidateRouteId);
+
+	if (shortName) {
+		const matched = index.routeIdsByShortName.get(shortName);
+
+		if (matched && matched.length > 0) {
+			return matched;
+		}
+	}
+
+	if (index.tripsByRouteId.has(candidateRouteId)) {
+		return [candidateRouteId];
+	}
+
+	return [];
 }
 
 function matchStopIds(index: GtfsIndex, stopName: string): string[] {
@@ -284,12 +418,12 @@ function matchStopIds(index: GtfsIndex, stopName: string): string[] {
 	return prefixHits;
 }
 
-function collectActiveTrips(index: GtfsIndex, routeIds: string[], after: Date): TripRecord[] {
+function collectActiveTrips(index: GtfsIndex, routeIds: string[], serviceDate: Date): TripRecord[] {
 	const active: TripRecord[] = [];
 
 	for (const routeId of routeIds) {
 		for (const trip of index.tripsByRouteId.get(routeId) ?? []) {
-			if (isServiceActive(index.calendarByServiceId.get(trip.serviceId), after)) {
+			if (isServiceActive(index, trip.serviceId, serviceDate)) {
 				active.push(trip);
 			}
 		}
@@ -298,12 +432,23 @@ function collectActiveTrips(index: GtfsIndex, routeIds: string[], after: Date): 
 	return active;
 }
 
-function isServiceActive(calendar: CalendarService | undefined, date: Date): boolean {
-	if (!calendar) {
+function isServiceActive(index: GtfsIndex, serviceId: string, date: Date): boolean {
+	const ymd = toGtfsDate(date);
+	const exception = index.calendarDateExceptions.get(calendarDateKey(serviceId, ymd));
+
+	if (exception === EXCEPTION_REMOVED) {
 		return false;
 	}
 
-	const ymd = toGtfsDate(date);
+	if (exception === EXCEPTION_ADDED) {
+		return true;
+	}
+
+	const calendar = index.calendarByServiceId.get(serviceId);
+
+	if (!calendar) {
+		return false;
+	}
 
 	if (calendar.startDate && ymd < calendar.startDate) {
 		return false;
@@ -316,6 +461,39 @@ function isServiceActive(calendar: CalendarService | undefined, date: Date): boo
 	return calendar.days[date.getDay()] === '1';
 }
 
+function nextBoardAndAlight(
+	points: StopTimePoint[],
+	boardStops: Set<string>,
+	alightStops: Set<string>,
+	afterSeconds: number
+): { boardSeconds: number; alightSeconds: number } | null {
+	let best: { boardSeconds: number; alightSeconds: number } | null = null;
+
+	for (const board of points) {
+		if (!boardStops.has(board.stopId) || board.departureSeconds < afterSeconds) {
+			continue;
+		}
+
+		const alight = points.find(
+			(point) => alightStops.has(point.stopId) && point.sequence > board.sequence
+		);
+
+		if (!alight) {
+			continue;
+		}
+
+		if (!best || board.departureSeconds < best.boardSeconds) {
+			best = { boardSeconds: board.departureSeconds, alightSeconds: alight.arrivalSeconds };
+		}
+	}
+
+	return best;
+}
+
+function calendarDateKey(serviceId: string, date: string): string {
+	return `${serviceId}\0${date}`;
+}
+
 function toGtfsDate(date: Date): string {
 	const year = date.getFullYear();
 	const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -323,22 +501,8 @@ function toGtfsDate(date: Date): string {
 	return `${year}${month}${day}`;
 }
 
-function secondsFromMidnight(date: Date): number {
-	return date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds();
-}
-
-export function parseGtfsClockToSeconds(clock: string): number | null {
-	const match = GTFS_CLOCK_PATTERN.exec(clock.trim());
-
-	if (!match) {
-		return null;
-	}
-
-	return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
-}
-
-function tripStopKey(tripId: string, stopId: string): string {
-	return `${tripId}\0${stopId}`;
+function secondsSinceServiceStart(at: Date, serviceDate: Date): number {
+	return (at.getTime() - startOfLocalDay(serviceDate).getTime()) / 1000;
 }
 
 function pushMapValue(map: Map<string, string[]>, key: string, value: string): void {

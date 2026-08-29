@@ -33,10 +33,6 @@ export function addSeconds(date: Date, seconds: number): Date {
 	return new Date(date.getTime() + seconds * 1000);
 }
 
-export function minutesBetween(from: Date, to: Date): number {
-	return Math.round((to.getTime() - from.getTime()) / 60000);
-}
-
 export function secondsBetween(from: Date, to: Date): number {
 	return Math.round((to.getTime() - from.getTime()) / 1000);
 }

@@ -1,3 +1,6 @@
 route_id,agency_id,route_short_name,route_long_name,route_type
 146,TEST,146,테스트146,3
 5001,TEST,5001,광역5001,3
+5002,TEST,5002,광역5002,3
+2,TEST,2호선,서울2호선,1
+WRONG,TEST,WRONG,잘못된노선,3

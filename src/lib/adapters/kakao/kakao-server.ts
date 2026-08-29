@@ -1,6 +1,4 @@
-import { EstimatedTimetable } from '$lib/adapters/gtfs/estimated-timetable';
-import { FallbackTimetable } from '$lib/adapters/gtfs/fallback-timetable';
-import { tryCreateGtfsTimetable } from '$lib/adapters/gtfs/gtfs-timetable';
+import { EmptyTimetable, tryCreateGtfsTimetable } from '$lib/adapters/gtfs/gtfs-timetable';
 import { KakaoScheduledRouteProvider } from '$lib/adapters/kakao/kakao-scheduled-route-provider';
 import { createKakaoTransitClient } from '$lib/adapters/kakao/kakao-transit-client';
 
@@ -16,11 +14,19 @@ export function getServerKakaoRouteProvider(
 		return cachedProvider;
 	}
 
+	const timetable = tryCreateGtfsTimetable(gtfsDir);
+
+	if (!timetable) {
+		console.error('GTFS timetable is not configured; scheduled routes will be unavailable', {
+			gtfsDir
+		});
+	}
+
 	cachedKey = restKey;
 	cachedGtfsDir = gtfsDir;
 	cachedProvider = new KakaoScheduledRouteProvider(
 		createKakaoTransitClient(restKey),
-		new FallbackTimetable(tryCreateGtfsTimetable(gtfsDir), new EstimatedTimetable())
+		timetable ?? new EmptyTimetable()
 	);
 
 	return cachedProvider;

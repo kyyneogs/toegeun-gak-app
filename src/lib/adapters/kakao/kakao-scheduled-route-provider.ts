@@ -1,19 +1,29 @@
 import type { KakaoTransitClient } from '$lib/adapters/kakao/kakao-transit-client';
 import {
-	mapKakaoRouteToTemplate,
-	pickKakaoTransitRoute
+	mapKakaoRouteToLiveTemplate,
+	mapKakaoRoutesToTopologies
 } from '$lib/adapters/kakao/kakao-transit-mapper';
-import { firstTransitLeg, materializeRouteTemplate } from '$lib/domain/route/schedule';
+import { ERROR_CODES } from '$lib/constants/errors';
+import {
+	firstTransitSegment,
+	lastTransitSegment,
+	withAccessWalks
+} from '$lib/domain/optimization/access-walk';
+import { formatRouteFailures } from '$lib/domain/optimization/failures';
+import { materializeOptimizedRoute } from '$lib/domain/optimization/materialize';
+import { recalculateRoute } from '$lib/domain/optimization/recalculate-route';
+import { collectRouteFailures } from '$lib/domain/optimization/select-best-route';
+import type { TopologyRoute } from '$lib/domain/optimization/types';
+import { AppError } from '$lib/domain/errors';
+import { materializeRouteTemplate } from '$lib/domain/route/schedule';
 import type { RouteRequest, TransitRoute } from '$lib/domain/route/route';
-import type { RouteTemplate } from '$lib/domain/route/template';
 import type { RouteProvider } from '$lib/ports/route-provider';
 import type { TimetablePort } from '$lib/ports/timetable-port';
-import { placePairKey } from '$lib/utils/geo';
-import { formatClock } from '$lib/utils/time';
+import { closestPoint, placePairKey, walkingSecondsBetween, type GeoPoint } from '$lib/utils/geo';
 
 interface CachedTopology {
-	template: RouteTemplate;
-	liveRoute: TransitRoute;
+	topologies: TopologyRoute[];
+	liveRoute: TransitRoute | null;
 }
 
 export class KakaoScheduledRouteProvider implements RouteProvider {
@@ -32,27 +42,44 @@ export class KakaoScheduledRouteProvider implements RouteProvider {
 	}
 
 	async findRoutes(request: RouteRequest): Promise<TransitRoute[]> {
-		const topology = await this.loadTopology(request);
+		const cached = await this.loadTopology(request);
 
-		if (!topology) {
+		if (!cached || cached.topologies.length === 0) {
 			return [];
 		}
 
-		const firstTransit = firstTransitLeg(topology.template);
-		const route = await materializeRouteTemplate(topology.template, {
-			provider: 'schedule',
-			routeId: `schedule_${formatClock(request.departureAt)}`,
-			leaveAt: request.departureAt,
-			applyHeadwayWait: true,
-			resolveFirstDeparture: (arriveAtStop) =>
-				this.timetable.nextDeparture({
-					routeName: firstTransit?.routeName ?? firstTransit?.routeId ?? '',
-					stopName: firstTransit?.startPlaceName ?? '',
-					after: arriveAtStop
-				})
+		if (this.timetable.prepare) {
+			await this.timetable.prepare(
+				collectCandidateRouteIds(cached.topologies),
+				request.departureAt
+			);
+		}
+
+		const recalculated = await Promise.all(
+			cached.topologies.map((topology, routeIndex) =>
+				recalculateRoute(
+					topology,
+					request.departureAt,
+					request.departureAt,
+					this.timetable,
+					routeIndex
+				)
+			)
+		);
+
+		const routes = recalculated.flatMap((route, index) => {
+			const materialized = materializeOptimizedRoute(route, request.departureAt, `gtfs_${index}`);
+			return materialized ? [materialized] : [];
 		});
 
-		return route ? [route] : [];
+		if (routes.length === 0) {
+			throw new AppError(
+				ERROR_CODES.ROUTE_NOT_FOUND,
+				formatRouteFailures(collectRouteFailures(recalculated))
+			);
+		}
+
+		return routes;
 	}
 
 	private loadTopology(
@@ -78,34 +105,105 @@ export class KakaoScheduledRouteProvider implements RouteProvider {
 		request: Pick<RouteRequest, 'origin' | 'destination'>
 	): Promise<CachedTopology | null> {
 		const payload = await this.client.search(request.origin, request.destination);
-		const kakaoRoute = pickKakaoTransitRoute(payload);
-
-		if (!kakaoRoute) {
-			return null;
-		}
-
-		const template = mapKakaoRouteToTemplate(
-			kakaoRoute,
+		const topologies = mapKakaoRoutesToTopologies(
+			payload,
 			request.origin.name,
 			request.destination.name
 		);
 
-		if (!template) {
+		if (topologies.length === 0) {
 			return null;
 		}
 
+		const topologiesWithWalks = await Promise.all(
+			topologies.map((topology) =>
+				attachAccessWalks(topology, request.origin, request.destination, this.timetable)
+			)
+		);
+
+		const liveTemplate = mapKakaoRouteToLiveTemplate(
+			payload,
+			request.origin.name,
+			request.destination.name
+		);
 		const liveAt = new Date();
-		const liveRoute = await materializeRouteTemplate(template, {
-			provider: 'kakao',
-			routeId: `kakao_live_${liveAt.toISOString()}`,
-			leaveAt: liveAt,
-			applyHeadwayWait: false
-		});
+		const liveRoute = liveTemplate
+			? await materializeRouteTemplate(liveTemplate, {
+					provider: 'kakao',
+					routeId: `kakao_live_${liveAt.toISOString()}`,
+					leaveAt: liveAt
+				})
+			: null;
 
-		if (!liveRoute) {
-			return null;
-		}
-
-		return { template, liveRoute };
+		return { topologies: topologiesWithWalks, liveRoute };
 	}
+}
+
+function collectCandidateRouteIds(topologies: TopologyRoute[]): string[] {
+	const routeIds: string[] = [];
+
+	for (const topology of topologies) {
+		for (const segment of topology.segments) {
+			if (segment.type === 'WALK') {
+				continue;
+			}
+
+			routeIds.push(...segment.candidateRouteIds);
+		}
+	}
+
+	return routeIds;
+}
+
+async function attachAccessWalks(
+	topology: TopologyRoute,
+	origin: GeoPoint & { name: string },
+	destination: GeoPoint & { name: string },
+	timetable: TimetablePort
+): Promise<TopologyRoute> {
+	if (!timetable.findStopCoordinates) {
+		return topology;
+	}
+
+	const startsWithWalk = topology.segments[0]?.type === 'WALK';
+	const endsWithWalk = topology.segments[topology.segments.length - 1]?.type === 'WALK';
+	const firstTransit = firstTransitSegment(topology);
+	const lastTransit = lastTransitSegment(topology);
+
+	const [toFirstStopSeconds, fromLastStopSeconds] = await Promise.all([
+		!startsWithWalk && firstTransit
+			? walkSecondsToNamedStop(origin, firstTransit.stopId, timetable)
+			: null,
+		!endsWithWalk && lastTransit
+			? walkSecondsToNamedStop(destination, lastTransit.alightStopId, timetable)
+			: null
+	]);
+
+	return withAccessWalks(
+		topology,
+		origin.name,
+		destination.name,
+		toFirstStopSeconds,
+		fromLastStopSeconds
+	);
+}
+
+async function walkSecondsToNamedStop(
+	from: GeoPoint,
+	stopName: string,
+	timetable: TimetablePort
+): Promise<number | null> {
+	if (!timetable.findStopCoordinates) {
+		return null;
+	}
+
+	const points = await timetable.findStopCoordinates(stopName);
+	const closest = closestPoint(from, points);
+
+	if (!closest) {
+		console.warn('Access walk skipped; GTFS has no coordinates for stop', { stopName });
+		return null;
+	}
+
+	return walkingSecondsBetween(from, closest);
 }

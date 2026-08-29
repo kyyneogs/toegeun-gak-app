@@ -1,26 +1,18 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import CandidateTable from '$lib/components/CandidateTable.svelte';
 	import SkeletonBlock from '$lib/components/SkeletonBlock.svelte';
-	import { KAKAO_LIVE_ROUTE_COPY, scheduleRouteCopy } from '$lib/constants/kakao';
+	import { scheduleRouteCopy } from '$lib/constants/kakao';
+	import { STAND_UP_BOARD_LABEL, STAND_UP_WALK_LABEL } from '$lib/constants/recommendation';
 	import { tripSession } from '$lib/stores/trip-session.svelte';
+	import { standUpStartsWithWalk, transitLineLabel } from '$lib/utils/route-label';
 	import { formatClock, formatDurationMinutes, fromIso } from '$lib/utils/time';
-
-	let showReasons = $state(false);
 
 	$effect(() => {
 		if (tripSession.status === 'idle') {
 			void goto(resolve('/'));
 		}
 	});
-
-	function liveRouteLabel(sections: { routeName?: string; type: string }[]): string {
-		const names = sections
-			.map((section) => section.routeName)
-			.filter((name): name is string => Boolean(name));
-		return names.length > 0 ? names.join(' · ') : '도보 포함 경로';
-	}
 </script>
 
 <header class="nav-row">
@@ -40,42 +32,16 @@
 	>
 {:else if tripSession.result && tripSession.trip}
 	{@const recommended = tripSession.result.recommended}
-	{@const liveRoute = tripSession.result.liveRoute}
-
-	{#if liveRoute}
-		<section class="field-block">
-			<div class="section-head">
-				<p class="section-label">지금 경로</p>
-				<span class="live-pill">실시간</span>
-			</div>
-			<p class="helper">{KAKAO_LIVE_ROUTE_COPY}</p>
-			<section class="card stats">
-				<p class="route-line">
-					{tripSession.trip.origin.name} → {tripSession.trip.destination.name}
-				</p>
-				<p class="route-meta">{liveRouteLabel(liveRoute.sections)}</p>
-				<div class="stat-row">
-					<span>소요시간</span>
-					<strong>{formatDurationMinutes(liveRoute.totalTimeSeconds)}</strong>
-				</div>
-				<div class="stat-row">
-					<span>환승</span>
-					<strong>{liveRoute.transferCount}회</strong>
-				</div>
-			</section>
-			<a
-				class="ghost-button link-button"
-				href={resolve('/result/route')}
-				onclick={() => tripSession.openRouteDetail('live')}
-			>
-				실시간 경로 자세히 보기
-			</a>
-		</section>
-	{/if}
+	{@const recommendedLine = transitLineLabel(recommended.route.sections)}
+	{@const standUpWalk = standUpStartsWithWalk(recommended.route.sections)}
+	{@const standUpLabel = standUpWalk ? STAND_UP_WALK_LABEL : STAND_UP_BOARD_LABEL}
+	{@const firstRide = recommended.chosenTrips[0]}
 
 	<section class="predicted">
 		<p class="hero-time">{formatClock(fromIso(recommended.departureAt))}</p>
-		<p class="hero-label">예상 퇴근각</p>
+		<p class="hero-label">{standUpLabel}</p>
+		<p class="hero-route">{recommendedLine}</p>
+		<p class="hero-arrival">{formatClock(fromIso(recommended.expectedArrivalAt))} 도착</p>
 		<p class="helper predicted-copy">{scheduleRouteCopy(tripSession.result.scheduleSource)}</p>
 		{#if tripSession.explanation}
 			<p class="summary">{tripSession.explanation.summary}</p>
@@ -84,24 +50,40 @@
 		<section class="card stats">
 			<p class="route-line">{tripSession.trip.origin.name} → {tripSession.trip.destination.name}</p>
 			<div class="stat-row">
-				<span>예상 소요시간</span>
-				<strong>{formatDurationMinutes(recommended.totalTimeSeconds)}</strong>
+				<span>{standUpWalk ? '일어나서 걷기' : '승차'}</span>
+				<strong>{formatClock(fromIso(recommended.departureAt))}</strong>
 			</div>
 			<div class="stat-row">
-				<span>예상 대기시간</span>
-				<strong>{formatDurationMinutes(recommended.waitingTimeSeconds)}</strong>
+				<span>이용 노선</span>
+				<strong>{recommendedLine}</strong>
 			</div>
+			{#if firstRide && standUpWalk}
+				<div class="stat-row">
+					<span>승차</span>
+					<strong>{formatClock(fromIso(firstRide.boardTime))}</strong>
+				</div>
+			{/if}
 			<div class="stat-row">
 				<span>예상 도착</span>
 				<strong>{formatClock(fromIso(recommended.expectedArrivalAt))}</strong>
 			</div>
+			<div class="stat-row">
+				<span>예상 소요시간</span>
+				<strong>{formatDurationMinutes(recommended.totalTimeSeconds)}</strong>
+			</div>
+			<div class="stat-row">
+				<span>예상 도보시간</span>
+				<strong>{formatDurationMinutes(recommended.walkingTimeSeconds)}</strong>
+			</div>
+			{#if recommended.waitingTimeSeconds > 0}
+				<div class="stat-row">
+					<span>예상 대기시간</span>
+					<strong>{formatDurationMinutes(recommended.waitingTimeSeconds)}</strong>
+				</div>
+			{/if}
 		</section>
 
-		<button class="ghost-button" type="button" onclick={() => (showReasons = !showReasons)}>
-			{showReasons ? '추천 이유 접기' : '추천 이유 보기'}
-		</button>
-
-		{#if showReasons && tripSession.explanation}
+		{#if tripSession.explanation}
 			<div class="card reasons">
 				{#each tripSession.explanation.details as detail, index (index)}
 					<p>{detail}</p>
@@ -109,41 +91,11 @@
 			</div>
 		{/if}
 
-		<section class="field-block">
-			<p class="section-label">다른 시간은?</p>
-			<CandidateTable
-				candidates={tripSession.result.alternatives}
-				recommendedDepartureAt={recommended.departureAt}
-			/>
-		</section>
-
-		<a
-			class="primary-button link-button"
-			href={resolve('/result/route')}
-			onclick={() => tripSession.openRouteDetail('predicted')}
-		>
-			이 시각 경로 보기
-		</a>
+		<a class="primary-button link-button" href={resolve('/result/route')}>이 경로 보기</a>
 	</section>
 {/if}
 
 <style>
-	.section-head {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 12px;
-	}
-
-	.live-pill {
-		padding: 3px 8px;
-		border-radius: var(--radius-pill);
-		background: #007aff24;
-		color: var(--color-accent);
-		font-size: 12px;
-		font-weight: 600;
-	}
-
 	.helper {
 		margin: 0 0 12px;
 		color: var(--color-secondary-label);
@@ -151,10 +103,21 @@
 		line-height: 1.4;
 	}
 
-	.predicted {
-		margin-top: 8px;
-		padding-top: 8px;
-		border-top: 1px solid var(--color-separator);
+	.hero-route {
+		margin: 4px 0 0;
+		color: var(--color-label);
+		font-size: 17px;
+		font-weight: 600;
+		text-align: center;
+	}
+
+	.hero-arrival {
+		margin: 4px 0 8px;
+		color: var(--color-secondary-label);
+		font-size: 17px;
+		font-weight: 600;
+		text-align: center;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.predicted-copy {
@@ -198,12 +161,6 @@
 	.route-line {
 		margin: 0 0 12px;
 		font-weight: 600;
-	}
-
-	.route-meta {
-		margin: -4px 0 8px;
-		color: var(--color-secondary-label);
-		font-size: 14px;
 	}
 
 	.stat-row {

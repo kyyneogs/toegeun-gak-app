@@ -49,24 +49,9 @@
 	<p class="section-label">언제부터 퇴근할 수 있나요?</p>
 	<div class="time-row card">
 		<input class="time-input" type="time" bind:value={tripSession.departureFromClock} />
-		<span class="muted">{tripSession.useRange ? '부터' : '이후'}</span>
+		<span class="muted">이후</span>
 	</div>
-
-	<button
-		class="ghost-button range-toggle"
-		type="button"
-		onclick={() => (tripSession.useRange = !tripSession.useRange)}
-	>
-		{tripSession.useRange ? '종료 시간 없이 보기' : '퇴근 가능 범위 정하기'}
-	</button>
-
-	{#if tripSession.useRange}
-		<div class="time-row card">
-			<input class="time-input" type="time" bind:value={tripSession.departureFromClock} />
-			<span class="muted">—</span>
-			<input class="time-input" type="time" bind:value={tripSession.departureUntilClock} />
-		</div>
-	{/if}
+	<p class="helper">이 시각 이후 출발해 가장 빨리 도착하는 경로를 고릅니다.</p>
 </section>
 
 <p class="status-copy">출발지 {settingsStore.origin.name}</p>
@@ -94,8 +79,11 @@
 		padding: 6px 12px;
 	}
 
-	.range-toggle {
-		margin-top: 4px;
+	.helper {
+		margin: 8px 0 0;
+		color: var(--color-secondary-label);
+		font-size: 13px;
+		line-height: 1.4;
 	}
 
 	.connection {

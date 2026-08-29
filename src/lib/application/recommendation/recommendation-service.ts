@@ -1,111 +1,68 @@
 import { ERROR_CODES } from '$lib/constants/errors';
-import { CANDIDATE_INTERVAL_MINUTES } from '$lib/constants/recommendation';
 import { AppError, isAppError } from '$lib/domain/errors';
-import { generateDepartureCandidates } from '$lib/domain/recommendation/candidates';
-import { buildRecommendation, pickBestRoute } from '$lib/domain/recommendation/engine';
-import type { RecommendationInput, RecommendationResult } from '$lib/domain/recommendation/types';
+import { selectEarliestArrival } from '$lib/domain/optimization/select-best-route';
+import type {
+	RecommendationInput,
+	RecommendationResult,
+	RecommendedRoute
+} from '$lib/domain/recommendation/types';
 import type { TransitRoute } from '$lib/domain/route/route';
 import type { RecommendationService } from '$lib/ports/recommendation-service';
 import type { RouteProvider } from '$lib/ports/route-provider';
-import { fromIso } from '$lib/utils/time';
-
-export interface RecommendationServiceOptions {
-	resolveSlotIntervalMinutes?: () => Promise<number>;
-}
+import { createId } from '$lib/utils/id';
+import { fromIso, toIso } from '$lib/utils/time';
 
 export class RecommendationApplicationService implements RecommendationService {
-	constructor(
-		private readonly routeProvider: RouteProvider,
-		private readonly options: RecommendationServiceOptions = {}
-	) {}
+	constructor(private readonly routeProvider: RouteProvider) {}
 
 	async recommend(input: RecommendationInput): Promise<RecommendationResult> {
-		const windowStart = fromIso(input.trip.departureFrom);
-		const windowEnd = fromIso(input.trip.departureUntil);
-		const desiredArrivalAt = input.trip.desiredArrivalAt
-			? fromIso(input.trip.desiredArrivalAt)
-			: undefined;
-		const intervalMinutes = await this.resolveSlotIntervalMinutes();
-		const departures = generateDepartureCandidates(windowStart, windowEnd, intervalMinutes);
+		const departureAfter = fromIso(input.trip.departureFrom);
+		const routes = await this.loadTimedRoutes(input, departureAfter);
+		const winner = selectEarliestArrival(routes);
 
-		if (departures.length === 0) {
-			throw new AppError(ERROR_CODES.INVALID_REQUEST);
+		if (!winner) {
+			throw new AppError(ERROR_CODES.ROUTE_NOT_FOUND);
 		}
 
-		const liveRoute = await this.loadLiveRoute(input);
-		const { routes, rateLimited } = await this.collectSlotRoutes(input, departures);
-
-		if (routes.length === 0) {
-			throw new AppError(
-				rateLimited ? ERROR_CODES.ROUTE_PROVIDER_RATE_LIMIT : ERROR_CODES.ROUTE_NOT_FOUND
-			);
-		}
-
-		return buildRecommendation({
+		return {
+			id: createId('rec'),
 			tripId: input.trip.id,
-			windowStart,
-			windowEnd,
-			desiredArrivalAt,
-			routesByDeparture: routes,
-			liveRoute
-		});
+			recommended: toRecommended(winner),
+			calculatedAt: toIso(new Date()),
+			scheduleSource: winner.scheduleSource
+		};
 	}
 
-	private async resolveSlotIntervalMinutes(): Promise<number> {
-		if (!this.options.resolveSlotIntervalMinutes) {
-			return CANDIDATE_INTERVAL_MINUTES;
-		}
-
-		return this.options.resolveSlotIntervalMinutes();
-	}
-
-	private async loadLiveRoute(input: RecommendationInput): Promise<TransitRoute | null> {
-		if (!this.routeProvider.findLiveRoute) {
-			return null;
-		}
-
-		return this.routeProvider.findLiveRoute(tripPoints(input));
-	}
-
-	private async collectSlotRoutes(
-		input: RecommendationInput,
-		departures: Date[]
-	): Promise<{ routes: TransitRoute[]; rateLimited: boolean }> {
-		const routes: TransitRoute[] = [];
-
-		for (const departureAt of departures) {
-			try {
-				const route = await this.findBestRoute(input, departureAt);
-				if (route) {
-					routes.push(route);
-				}
-			} catch (cause) {
-				if (isRateLimit(cause)) {
-					return { routes, rateLimited: true };
-				}
-
-				if (isAppError(cause)) {
-					throw cause;
-				}
-
-				throw new AppError(ERROR_CODES.ROUTE_PROVIDER_TIMEOUT, undefined, cause);
-			}
-		}
-
-		return { routes, rateLimited: false };
-	}
-
-	private async findBestRoute(
+	private async loadTimedRoutes(
 		input: RecommendationInput,
 		departureAt: Date
-	): Promise<TransitRoute | null> {
-		const routes = await this.routeProvider.findRoutes({
-			...tripPoints(input),
-			departureAt
-		});
+	): Promise<TransitRoute[]> {
+		try {
+			return await this.routeProvider.findRoutes({
+				...tripPoints(input),
+				departureAt
+			});
+		} catch (cause) {
+			if (isAppError(cause)) {
+				throw cause;
+			}
 
-		return pickBestRoute(routes);
+			throw new AppError(ERROR_CODES.ROUTE_PROVIDER_TIMEOUT, undefined, cause);
+		}
 	}
+}
+
+function toRecommended(route: TransitRoute): RecommendedRoute {
+	return {
+		departureAt: route.departureAt,
+		expectedArrivalAt: route.arrivalAt,
+		totalTimeSeconds: route.totalTimeSeconds,
+		waitingTimeSeconds: route.waitingTimeSeconds,
+		walkingTimeSeconds: route.walkingTimeSeconds,
+		transferCount: route.transferCount,
+		route,
+		chosenTrips: route.chosenTrips ?? []
+	};
 }
 
 function tripPoints(input: RecommendationInput) {
@@ -121,8 +78,4 @@ function tripPoints(input: RecommendationInput) {
 			longitude: input.trip.destination.longitude
 		}
 	};
-}
-
-function isRateLimit(cause: unknown): boolean {
-	return isAppError(cause) && cause.code === ERROR_CODES.ROUTE_PROVIDER_RATE_LIMIT;
 }

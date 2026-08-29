@@ -15,6 +15,13 @@ export interface RouteSection {
 	vehicleType?: string;
 }
 
+export interface ChosenTrip {
+	routeId: string;
+	tripId: string;
+	boardTime: string;
+	alightTime: string;
+}
+
 export interface TransitRoute {
 	provider: string;
 	routeId: string;
@@ -27,6 +34,7 @@ export interface TransitRoute {
 	arrivalAt: string;
 	sections: RouteSection[];
 	scheduleSource?: ScheduleSource;
+	chosenTrips?: ChosenTrip[];
 }
 
 export interface RouteRequest {

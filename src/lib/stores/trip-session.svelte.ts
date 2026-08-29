@@ -19,15 +19,12 @@ export type UiStatus = 'idle' | 'searching' | 'calculating' | 'result' | 'error'
 class TripSessionStore {
 	destination = $state<Place | null>(null);
 	departureFromClock = $state(DEFAULT_DEPARTURE_FROM);
-	departureUntilClock = $state('19:00');
-	useRange = $state(false);
 	status = $state<UiStatus>('idle');
 	errorMessage = $state<string | null>(null);
 	errorCode = $state<string | null>(null);
 	trip = $state<Trip | null>(null);
 	result = $state<RecommendationResult | null>(null);
 	explanation = $state<RecommendationExplanation | null>(null);
-	routeDetailKind = $state<'live' | 'predicted'>('predicted');
 
 	hydrateFromSettings(): void {
 		this.departureFromClock = settingsStore.defaultDepartureFrom;
@@ -71,21 +68,15 @@ class TripSessionStore {
 		this.errorMessage = null;
 		this.result = null;
 		this.explanation = null;
-		this.routeDetailKind = 'predicted';
 		await goto(resolve('/result'));
 
 		try {
 			const services = getAppServices();
 			const departureFrom = combineLocalDateAndClock(this.departureFromClock);
-			const departureUntil =
-				this.useRange && isClockTime(this.departureUntilClock)
-					? combineLocalDateAndClock(this.departureUntilClock)
-					: undefined;
 			const trip = await services.tripService.createTrip({
 				origin: settingsStore.origin,
 				destination: this.destination,
-				departureFrom,
-				departureUntil
+				departureFrom
 			});
 			const result = await services.recommendationService.recommend({ trip });
 			const explanation = await services.explanationService.explain(result, {
@@ -106,10 +97,6 @@ class TripSessionStore {
 		}
 	}
 
-	openRouteDetail(kind: 'live' | 'predicted'): void {
-		this.routeDetailKind = kind;
-	}
-
 	resetResult(): void {
 		this.status = 'idle';
 		this.errorCode = null;
@@ -117,7 +104,6 @@ class TripSessionStore {
 		this.result = null;
 		this.explanation = null;
 		this.trip = null;
-		this.routeDetailKind = 'predicted';
 	}
 }
 
