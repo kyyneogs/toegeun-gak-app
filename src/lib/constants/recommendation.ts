@@ -13,3 +13,6 @@ export const PLACE_SEARCH_DEBOUNCE_MS = 250;
 
 export const STAND_UP_WALK_LABEL = '이때 일어나서 걸으세요';
 export const STAND_UP_BOARD_LABEL = '이때 타세요';
+export const HEADWAY_MISS_SECONDS = 60;
+export const HEADWAY_ALT_COST_KRW = 15_000;
+export const HEADWAY_LOSS_TITLE = '추천보다 1분만 늦으면';

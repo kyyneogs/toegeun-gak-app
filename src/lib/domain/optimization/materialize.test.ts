@@ -59,4 +59,17 @@ describe('materializeOptimizedRoute', () => {
 		expect(formatClock(new Date(bus!.departureAt))).toBe('18:15');
 		expect(route?.chosenTrips?.[0]?.tripId).toBe('5002_A');
 	});
+
+	it('keeps walking immediately when comparing wait at arbitrary leave times', () => {
+		const route = materializeOptimizedRoute(
+			ROUTE,
+			combineLocalDateAndClock('18:00', DAY),
+			'wait_sample',
+			{ alignWalkToBoard: false }
+		);
+		const wait = route?.sections.find((section) => section.type === 'wait');
+
+		expect(formatClock(new Date(route!.departureAt))).toBe('18:00');
+		expect(wait?.waitingTimeSeconds).toBe(9 * 60);
+	});
 });

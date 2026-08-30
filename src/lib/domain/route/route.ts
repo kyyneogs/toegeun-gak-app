@@ -2,6 +2,17 @@ import type { ScheduleSource } from '$lib/domain/route/timetable';
 
 export type RouteSectionType = 'walk' | 'bus' | 'subway' | 'wait';
 
+export type HeadwayLoss =
+	| {
+			kind: 'arrivalDelay';
+			delaySeconds: number;
+	  }
+	| {
+			kind: 'lastTrip';
+			routeId: string;
+			estimatedCostKrw: number;
+	  };
+
 export interface RouteSection {
 	sequence: number;
 	type: RouteSectionType;
@@ -35,6 +46,7 @@ export interface TransitRoute {
 	sections: RouteSection[];
 	scheduleSource?: ScheduleSource;
 	chosenTrips?: ChosenTrip[];
+	headwayLoss?: HeadwayLoss | null;
 }
 
 export interface RouteRequest {

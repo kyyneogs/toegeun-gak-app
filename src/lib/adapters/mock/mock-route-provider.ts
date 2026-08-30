@@ -1,4 +1,5 @@
 import {
+	HEADWAY_ALT_COST_KRW,
 	MOCK_BUS_INTERVAL_MINUTES,
 	MOCK_BUS_RIDE_MINUTES,
 	MOCK_FIRST_BUS,
@@ -9,10 +10,21 @@ import {
 	MOCK_WALK_TO_STOP_MINUTES
 } from '$lib/constants/recommendation';
 import { nextBusAt } from '$lib/domain/route/headway';
-import type { RouteRequest, RouteSection, TransitRoute } from '$lib/domain/route/route';
+import type {
+	HeadwayLoss,
+	RouteRequest,
+	RouteSection,
+	TransitRoute
+} from '$lib/domain/route/route';
 import type { RouteProvider } from '$lib/ports/route-provider';
 import { createId } from '$lib/utils/id';
-import { addMinutes, combineLocalDateAndClock, secondsBetween, toIso } from '$lib/utils/time';
+import {
+	addMinutes,
+	addSeconds,
+	combineLocalDateAndClock,
+	secondsBetween,
+	toIso
+} from '$lib/utils/time';
 
 export interface MockRouteProviderOptions {
 	delayMs?: number;
@@ -132,8 +144,56 @@ export class MockRouteProvider implements RouteProvider {
 				transferCount: 0,
 				departureAt: toIso(leaveAt),
 				arrivalAt: toIso(destArrival),
-				sections
+				sections,
+				headwayLoss: mockHeadwayLoss({
+					routeId: this.routeName,
+					destArrival,
+					busDeparture,
+					firstBus,
+					lastBus,
+					intervalMinutes: this.busIntervalMinutes,
+					busRideMinutes: this.busRideMinutes,
+					walkToDestMinutes: this.walkToDestMinutes
+				})
 			}
 		];
 	}
+}
+
+function mockHeadwayLoss(options: {
+	routeId: string;
+	destArrival: Date;
+	busDeparture: Date;
+	firstBus: Date;
+	lastBus: Date;
+	intervalMinutes: number;
+	busRideMinutes: number;
+	walkToDestMinutes: number;
+}): HeadwayLoss | null {
+	const nextBus = nextBusAt(
+		addSeconds(options.busDeparture, 1),
+		options.firstBus,
+		options.lastBus,
+		options.intervalMinutes
+	);
+
+	if (!nextBus) {
+		return {
+			kind: 'lastTrip',
+			routeId: options.routeId,
+			estimatedCostKrw: HEADWAY_ALT_COST_KRW
+		};
+	}
+
+	const missedArrival = addMinutes(
+		addMinutes(nextBus, options.busRideMinutes),
+		options.walkToDestMinutes
+	);
+	const delaySeconds = secondsBetween(options.destArrival, missedArrival);
+
+	if (delaySeconds <= 0) {
+		return null;
+	}
+
+	return { kind: 'arrivalDelay', delaySeconds };
 }

@@ -54,7 +54,8 @@ function makeResult(routeIds: string[]): RecommendationResult {
 			walkingTimeSeconds: 0,
 			transferCount: 0,
 			route,
-			chosenTrips: route.chosenTrips ?? []
+			chosenTrips: route.chosenTrips ?? [],
+			headwayLoss: null
 		},
 		calculatedAt: toIso(departure),
 		scheduleSource: 'gtfs'

@@ -10,9 +10,13 @@ import {
 	withAccessWalks
 } from '$lib/domain/optimization/access-walk';
 import { formatRouteFailures } from '$lib/domain/optimization/failures';
+import { measureHeadwayLoss } from '$lib/domain/optimization/headway-loss';
 import { materializeOptimizedRoute } from '$lib/domain/optimization/materialize';
 import { recalculateRoute } from '$lib/domain/optimization/recalculate-route';
-import { collectRouteFailures } from '$lib/domain/optimization/select-best-route';
+import {
+	collectRouteFailures,
+	selectEarliestArrival
+} from '$lib/domain/optimization/select-best-route';
 import type { TopologyRoute } from '$lib/domain/optimization/types';
 import { AppError } from '$lib/domain/errors';
 import { materializeRouteTemplate } from '$lib/domain/route/schedule';
@@ -79,6 +83,7 @@ export class KakaoScheduledRouteProvider implements RouteProvider {
 			);
 		}
 
+		await attachHeadwayLoss(routes, request.departureAt, this.timetable);
 		return routes;
 	}
 
@@ -153,6 +158,20 @@ function collectCandidateRouteIds(topologies: TopologyRoute[]): string[] {
 	}
 
 	return routeIds;
+}
+
+async function attachHeadwayLoss(
+	routes: TransitRoute[],
+	serviceDate: Date,
+	timetable: TimetablePort
+): Promise<void> {
+	const winner = selectEarliestArrival(routes);
+
+	if (!winner) {
+		return;
+	}
+
+	winner.headwayLoss = await measureHeadwayLoss(winner, serviceDate, timetable);
 }
 
 async function attachAccessWalks(

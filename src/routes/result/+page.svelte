@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import SkeletonBlock from '$lib/components/SkeletonBlock.svelte';
+	import WaitComparison from '$lib/components/WaitComparison.svelte';
 	import { scheduleRouteCopy } from '$lib/constants/kakao';
 	import { STAND_UP_BOARD_LABEL, STAND_UP_WALK_LABEL } from '$lib/constants/recommendation';
 	import { tripSession } from '$lib/stores/trip-session.svelte';
@@ -82,6 +83,10 @@
 				</div>
 			{/if}
 		</section>
+
+		{#if recommended.headwayLoss}
+			<WaitComparison loss={recommended.headwayLoss} />
+		{/if}
 
 		{#if tripSession.explanation}
 			<div class="card reasons">

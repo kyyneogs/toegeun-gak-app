@@ -61,7 +61,8 @@ function toRecommended(route: TransitRoute): RecommendedRoute {
 		walkingTimeSeconds: route.walkingTimeSeconds,
 		transferCount: route.transferCount,
 		route,
-		chosenTrips: route.chosenTrips ?? []
+		chosenTrips: route.chosenTrips ?? [],
+		headwayLoss: route.headwayLoss ?? null
 	};
 }
 

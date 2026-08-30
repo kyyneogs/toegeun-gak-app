@@ -6,15 +6,17 @@ import { addSeconds, secondsBetween, toIso } from '$lib/utils/time';
 export function materializeOptimizedRoute(
 	route: RecalculatedRoute,
 	earliestLeaveAt: Date,
-	routeId: string
+	routeId: string,
+	options: { alignWalkToBoard?: boolean } = {}
 ): TransitRoute | null {
 	if (route.invalid || !route.finalArrivalTime) {
 		return null;
 	}
 
-	const standup = standupAt(route, earliestLeaveAt);
+	const alignWalkToBoard = options.alignWalkToBoard !== false;
+	const walkStart = alignWalkToBoard ? standupAt(route, earliestLeaveAt) : earliestLeaveAt;
 	const sections: RouteSection[] = [];
-	let cursor = standup;
+	let cursor = walkStart;
 	let waitingTimeSeconds = 0;
 	let walkingTimeSeconds = 0;
 	let movingTimeSeconds = 0;
@@ -67,12 +69,12 @@ export function materializeOptimizedRoute(
 	return {
 		provider: 'gtfs',
 		routeId,
-		totalTimeSeconds: secondsBetween(standup, route.finalArrivalTime),
+		totalTimeSeconds: secondsBetween(walkStart, route.finalArrivalTime),
 		movingTimeSeconds,
 		waitingTimeSeconds,
 		walkingTimeSeconds,
 		transferCount: Math.max(0, transitCount - 1),
-		departureAt: toIso(standup),
+		departureAt: toIso(walkStart),
 		arrivalAt: toIso(route.finalArrivalTime),
 		sections,
 		scheduleSource: 'gtfs',

@@ -5,7 +5,9 @@ import { KakaoScheduledRouteProvider } from '$lib/adapters/kakao/kakao-scheduled
 import type { KakaoTransitClient } from '$lib/adapters/kakao/kakao-transit-client';
 import type { KakaoTransitResponse } from '$lib/adapters/kakao/kakao-transit-document';
 import { ERROR_CODES } from '$lib/constants/errors';
+import { HEADWAY_ALT_COST_KRW } from '$lib/constants/recommendation';
 import { AppError } from '$lib/domain/errors';
+import type { NextTripQuery, TimetablePort } from '$lib/ports/timetable-port';
 import { combineLocalDateAndClock, formatClock } from '$lib/utils/time';
 import { describe, expect, it } from 'vitest';
 
@@ -68,6 +70,25 @@ function stubClient(
 	return client;
 }
 
+class RecordingTimetable implements TimetablePort {
+	readonly queriedRouteIds: string[] = [];
+
+	constructor(private readonly inner: GtfsTimetable) {}
+
+	prepare(routeIds: string[], serviceDate: Date): Promise<void> {
+		return this.inner.prepare(routeIds, serviceDate);
+	}
+
+	findStopCoordinates(stopName: string) {
+		return this.inner.findStopCoordinates(stopName);
+	}
+
+	async findNextTrip(query: NextTripQuery) {
+		this.queriedRouteIds.push(query.routeId);
+		return this.inner.findNextTrip(query);
+	}
+}
+
 describe('KakaoScheduledRouteProvider', () => {
 	it('calls Kakao once for live and scheduled lookups', async () => {
 		const client = stubClient();
@@ -106,6 +127,29 @@ describe('KakaoScheduledRouteProvider', () => {
 		expect(formatClock(new Date(bus!.departureAt))).toBe('18:15');
 		expect(formatClock(new Date(bus!.arrivalAt))).toBe('18:40');
 		expect(bus?.routeId).toBe('5002');
+	});
+
+	it('measures next-bus loss on the winning route only, not Kakao alternatives', async () => {
+		const client = stubClient();
+		const timetable = new RecordingTimetable(new GtfsTimetable(GTFS_FIXTURE_DIR));
+		const provider = new KakaoScheduledRouteProvider(client, timetable);
+
+		const routes = await provider.findRoutes({
+			...POINTS,
+			departureAt: combineLocalDateAndClock('18:00', DAY)
+		});
+		const winner = routes.find((route) => route.headwayLoss);
+
+		expect(winner?.sections.some((section) => section.routeId === '5002')).toBe(true);
+		expect(winner?.headwayLoss).toEqual({
+			kind: 'lastTrip',
+			routeId: '5002',
+			estimatedCostKrw: HEADWAY_ALT_COST_KRW
+		});
+		expect(timetable.queriedRouteIds.filter((routeId) => routeId === '5001')).toHaveLength(1);
+		expect(
+			timetable.queriedRouteIds.filter((routeId) => routeId === '5002').length
+		).toBeGreaterThan(1);
 	});
 
 	it('adds GTFS access walks when Kakao starts at the bus stop', async () => {

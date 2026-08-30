@@ -1,4 +1,4 @@
-import type { ChosenTrip, TransitRoute } from '$lib/domain/route/route';
+import type { ChosenTrip, HeadwayLoss, TransitRoute } from '$lib/domain/route/route';
 import type { ScheduleSource } from '$lib/domain/route/timetable';
 import type { Trip } from '$lib/domain/trip/trip';
 
@@ -11,6 +11,7 @@ export interface RecommendedRoute {
 	transferCount: number;
 	route: TransitRoute;
 	chosenTrips: ChosenTrip[];
+	headwayLoss: HeadwayLoss | null;
 }
 
 export interface RecommendationResult {
