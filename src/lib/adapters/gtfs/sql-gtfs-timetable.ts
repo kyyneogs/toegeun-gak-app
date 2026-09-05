@@ -76,9 +76,10 @@ export async function hasSqlGtfsSlice(): Promise<boolean> {
 	}
 }
 
+const STOP_NAME_CANDIDATE_LIMIT = 80;
+const TRIP_ID_IN_CHUNK = 200;
+
 export class SqlGtfsTimetable implements TimetablePort {
-	private routesPromise: Promise<Map<string, string[]>> | null = null;
-	private stopsPromise: Promise<SqlStopRow[]> | null = null;
 	private readonly routeIdsByCandidate = new Map<string, Promise<string[]>>();
 	private readonly stopMatchesByName = new Map<string, Promise<SqlStopRow[]>>();
 	private readonly activeTripsByRouteAndDate = new Map<string, Promise<SqlTripRow[]>>();
@@ -87,16 +88,12 @@ export class SqlGtfsTimetable implements TimetablePort {
 		Promise<Map<string, GtfsCalendarWindow>>
 	>();
 	private readonly exceptionsByServiceSetAndDate = new Map<string, Promise<Map<string, string>>>();
-	private readonly stopTimesByTrip = new Map<string, StopTimePoint[]>();
+	private readonly stopTimesByTripAndStops = new Map<string, StopTimePoint[]>();
 
 	async prepare(routeIds: string[], serviceDate: Date): Promise<void> {
-		const trips = (
-			await Promise.all(
-				[...new Set(routeIds)].map((routeId) => this.activeTripsForRoute(routeId, serviceDate))
-			)
-		).flat();
-
-		await this.ensureStopTimes(trips.map((trip) => trip.trip_id));
+		await Promise.all(
+			[...new Set(routeIds)].map((routeId) => this.activeTripsForRoute(routeId, serviceDate))
+		);
 	}
 
 	async findStopCoordinates(stopName: string): Promise<GeoPoint[]> {
@@ -122,13 +119,17 @@ export class SqlGtfsTimetable implements TimetablePort {
 
 		const boardIds = new Set(boardStops.map((stop) => stop.stop_id));
 		const alightIds = new Set(alightStops.map((stop) => stop.stop_id));
-		await this.ensureStopTimes(activeTrips.map((trip) => trip.trip_id));
+		const relevantStopIds = [...new Set([...boardIds, ...alightIds])];
+		await this.ensureStopTimes(
+			activeTrips.map((trip) => trip.trip_id),
+			relevantStopIds
+		);
 
 		const afterSeconds = secondsSinceServiceStart(query.after, query.serviceDate);
 		let best: { trip: SqlTripRow; boardSeconds: number; alightSeconds: number } | null = null;
 
 		for (const trip of activeTrips) {
-			const points = this.stopTimesByTrip.get(trip.trip_id);
+			const points = this.stopTimesByTripAndStops.get(stopTimesKey(trip.trip_id, relevantStopIds));
 
 			if (!points) {
 				continue;
@@ -176,66 +177,44 @@ export class SqlGtfsTimetable implements TimetablePort {
 	}
 
 	private async loadMatchedStops(stopName: string): Promise<SqlStopRow[]> {
-		const stops = await this.ensureStops();
 		const trimmed = stopName.trim();
-		const exact = stops.filter((stop) => stop.stop_name === trimmed);
+
+		if (!trimmed) {
+			return [];
+		}
+
+		const lookupNames = uniqueStopNameLookups(trimmed);
+		const exactClause = inClause(lookupNames);
+		const exactRows = await query<SqlStopRow>(
+			`SELECT stop_id, stop_name, stop_lat, stop_lon FROM gtfs_stops WHERE stop_name IN (${exactClause.sql})`,
+			exactClause.params
+		);
+		const exact = exactRows.filter((stop) => stop.stop_name === trimmed);
 
 		if (exact.length > 0) {
 			return exact;
 		}
 
 		const normalized = normalizeStopName(trimmed);
-		const byNormalized = stops.filter((stop) => normalizeStopName(stop.stop_name) === normalized);
+		const byNormalized = exactRows.filter(
+			(stop) => normalizeStopName(stop.stop_name) === normalized
+		);
 
 		if (byNormalized.length > 0) {
 			return byNormalized;
 		}
 
-		return stops.filter((stop) => isStopNameMatch(trimmed, stop.stop_name));
-	}
+		const prefixes = [...new Set([trimmed, normalized].filter((value) => value.length > 0))];
+		const likeClause = prefixes.map((_, index) => `stop_name LIKE $${index + 1}`).join(' OR ');
+		const prefixRows = await query<SqlStopRow>(
+			`SELECT stop_id, stop_name, stop_lat, stop_lon
+			 FROM gtfs_stops
+			 WHERE ${likeClause}
+			 LIMIT ${STOP_NAME_CANDIDATE_LIMIT}`,
+			prefixes.map((value) => `${value}%`)
+		);
 
-	private ensureStops(): Promise<SqlStopRow[]> {
-		if (!this.stopsPromise) {
-			this.stopsPromise = query<SqlStopRow>(
-				'SELECT stop_id, stop_name, stop_lat, stop_lon FROM gtfs_stops'
-			).catch((cause) => {
-				this.stopsPromise = null;
-				throw cause;
-			});
-		}
-
-		return this.stopsPromise;
-	}
-
-	private async routeIdsByShortName(): Promise<Map<string, string[]>> {
-		if (!this.routesPromise) {
-			this.routesPromise = query<SqlRouteRow>('SELECT route_id, route_short_name FROM gtfs_routes')
-				.then((rows) => {
-					const map = new Map<string, string[]>();
-
-					for (const row of rows) {
-						const shortName = extractRouteShortName(row.route_short_name ?? '');
-
-						if (!shortName) {
-							continue;
-						}
-
-						for (const key of routeShortNameKeys(shortName)) {
-							const ids = map.get(key) ?? [];
-							ids.push(row.route_id);
-							map.set(key, ids);
-						}
-					}
-
-					return map;
-				})
-				.catch((cause) => {
-					this.routesPromise = null;
-					throw cause;
-				});
-		}
-
-		return this.routesPromise;
+		return prefixRows.filter((stop) => isStopNameMatch(trimmed, stop.stop_name));
 	}
 
 	private async activeTripsForRoute(routeId: string, serviceDate: Date): Promise<SqlTripRow[]> {
@@ -309,12 +288,22 @@ export class SqlGtfsTimetable implements TimetablePort {
 
 	private async loadRouteIds(candidateRouteId: string): Promise<string[]> {
 		const shortName = extractRouteShortName(candidateRouteId);
-		const byShortName = await this.routeIdsByShortName();
 
 		if (shortName) {
-			const matched = byShortName.get(shortName);
+			const lookupNames = [...new Set(routeShortNameKeys(shortName))];
+			const { sql, params } = inClause(lookupNames);
+			const rows = await query<SqlRouteRow>(
+				`SELECT route_id, route_short_name FROM gtfs_routes WHERE route_short_name IN (${sql})`,
+				params
+			);
+			const matched = rows
+				.filter((row) => {
+					const gtfsShortName = extractRouteShortName(row.route_short_name ?? '');
+					return gtfsShortName.length > 0 && routeShortNameKeys(gtfsShortName).includes(shortName);
+				})
+				.map((row) => row.route_id);
 
-			if (matched && matched.length > 0) {
+			if (matched.length > 0) {
 				return [...new Set(matched)];
 			}
 		}
@@ -359,44 +348,58 @@ export class SqlGtfsTimetable implements TimetablePort {
 		return pending;
 	}
 
-	private async ensureStopTimes(tripIds: string[]): Promise<void> {
-		const missing = [...new Set(tripIds)].filter((tripId) => !this.stopTimesByTrip.has(tripId));
+	private async ensureStopTimes(tripIds: string[], stopIds: string[]): Promise<void> {
+		const uniqueTripIds = [...new Set(tripIds)];
+		const uniqueStopIds = [...new Set(stopIds)];
+
+		if (uniqueTripIds.length === 0 || uniqueStopIds.length === 0) {
+			return;
+		}
+
+		const missing = uniqueTripIds.filter(
+			(tripId) => !this.stopTimesByTripAndStops.has(stopTimesKey(tripId, uniqueStopIds))
+		);
 
 		if (missing.length === 0) {
 			return;
 		}
 
-		const { sql, params } = inClause(missing);
-		const rows = await query<SqlStopTimeRow>(
-			`SELECT trip_id, stop_id, stop_sequence, arrival_time, departure_time
-			 FROM gtfs_stop_times
-			 WHERE trip_id IN (${sql})
-			 ORDER BY trip_id, stop_sequence`,
-			params
-		);
-
 		for (const tripId of missing) {
-			this.stopTimesByTrip.set(tripId, []);
+			this.stopTimesByTripAndStops.set(stopTimesKey(tripId, uniqueStopIds), []);
 		}
 
-		for (const row of rows) {
-			const departureSeconds = parseGtfsClockToSeconds(
-				row.departure_time || row.arrival_time || ''
+		for (let offset = 0; offset < missing.length; offset += TRIP_ID_IN_CHUNK) {
+			const tripChunk = missing.slice(offset, offset + TRIP_ID_IN_CHUNK);
+			const tripClause = inClause(tripChunk);
+			const stopClause = inClause(uniqueStopIds, tripClause.params.length);
+			const rows = await query<SqlStopTimeRow>(
+				`SELECT trip_id, stop_id, stop_sequence, arrival_time, departure_time
+				 FROM gtfs_stop_times
+				 WHERE trip_id IN (${tripClause.sql}) AND stop_id IN (${stopClause.sql})
+				 ORDER BY trip_id, stop_sequence`,
+				[...tripClause.params, ...stopClause.params]
 			);
-			const arrivalSeconds = parseGtfsClockToSeconds(row.arrival_time || row.departure_time || '');
 
-			if (departureSeconds === null || arrivalSeconds === null) {
-				continue;
+			for (const row of rows) {
+				const departureSeconds = parseGtfsClockToSeconds(
+					row.departure_time || row.arrival_time || ''
+				);
+				const arrivalSeconds = parseGtfsClockToSeconds(row.arrival_time || row.departure_time || '');
+
+				if (departureSeconds === null || arrivalSeconds === null) {
+					continue;
+				}
+
+				const key = stopTimesKey(row.trip_id, uniqueStopIds);
+				const points = this.stopTimesByTripAndStops.get(key) ?? [];
+				points.push({
+					stopId: row.stop_id,
+					sequence: Number(row.stop_sequence),
+					arrivalSeconds,
+					departureSeconds
+				});
+				this.stopTimesByTripAndStops.set(key, points);
 			}
-
-			const points = this.stopTimesByTrip.get(row.trip_id) ?? [];
-			points.push({
-				stopId: row.stop_id,
-				sequence: Number(row.stop_sequence),
-				arrivalSeconds,
-				departureSeconds
-			});
-			this.stopTimesByTrip.set(row.trip_id, points);
 		}
 	}
 }
@@ -442,11 +445,24 @@ async function loadExceptions(
 	return exceptions;
 }
 
-function inClause(values: string[]): { sql: string; params: string[] } {
+function inClause(values: string[], paramOffset = 0): { sql: string; params: string[] } {
 	return {
-		sql: values.map((_, index) => `$${index + 1}`).join(', '),
+		sql: values.map((_, index) => `$${paramOffset + index + 1}`).join(', '),
 		params: values
 	};
+}
+
+function stopTimesKey(tripId: string, stopIds: string[]): string {
+	return `${tripId}|${[...stopIds].sort().join(',')}`;
+}
+
+function uniqueStopNameLookups(stopName: string): string[] {
+	const trimmed = stopName.trim();
+	const compacted = trimmed.replace(/\s+/g, '');
+	const normalized = normalizeStopName(trimmed);
+	const withStation = normalized ? `${normalized}역` : '';
+
+	return [...new Set([trimmed, compacted, normalized, withStation].filter((value) => value !== ''))];
 }
 
 function serviceSetKey(serviceIds: string[]): string {
