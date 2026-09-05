@@ -115,15 +115,13 @@ CREATE TABLE IF NOT EXISTS gtfs_trips (
 
 CREATE INDEX IF NOT EXISTS gtfs_trips_route_idx ON gtfs_trips (route_id);
 
+-- pickup_type, drop_off_type, timepoint는 CSV에 있으나 조회에 안 쓰고 행 수가 커서 생략
 CREATE TABLE IF NOT EXISTS gtfs_stop_times (
 	trip_id TEXT NOT NULL REFERENCES gtfs_trips (trip_id) ON DELETE CASCADE,
 	arrival_time TEXT NOT NULL,
 	departure_time TEXT NOT NULL,
 	stop_id TEXT NOT NULL,
 	stop_sequence INTEGER NOT NULL,
-	pickup_type TEXT,
-	drop_off_type TEXT,
-	timepoint TEXT,
 	PRIMARY KEY (trip_id, stop_sequence)
 );
 

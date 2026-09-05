@@ -86,15 +86,17 @@ describe('SqlGtfsTimetable.findNextTrip', () => {
 });
 
 describe('loadGtfsSliceFromDirectory', () => {
-	it('keeps corridor short names and drops others', async () => {
-		const wrong = await queryOne('SELECT gtfs_route_id FROM gtfs_routes WHERE short_name = $1', [
-			'WRONG'
-		]);
-		const bus = await queryOne('SELECT gtfs_route_id FROM gtfs_routes WHERE short_name = $1', [
-			'5002'
-		]);
+	it('loads CSV route_id values without dropping extra short names', async () => {
+		const wrong = await queryOne<{ route_id: string }>(
+			'SELECT route_id FROM gtfs_routes WHERE route_short_name = $1',
+			['WRONG']
+		);
+		const bus = await queryOne<{ route_id: string }>(
+			'SELECT route_id FROM gtfs_routes WHERE route_short_name = $1',
+			['5002']
+		);
 
-		expect(wrong).toBeNull();
-		expect(bus?.gtfs_route_id).toBe('5002');
+		expect(wrong?.route_id).toBe('WRONG');
+		expect(bus?.route_id).toBe('5002');
 	});
 });

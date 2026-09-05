@@ -66,64 +66,67 @@ CREATE INDEX IF NOT EXISTS standup_jobs_due_idx ON standup_jobs (fire_at);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS standup_lead_minutes INTEGER NOT NULL DEFAULT 5;
 
 CREATE TABLE IF NOT EXISTS gtfs_routes (
-	gtfs_route_id TEXT PRIMARY KEY,
-	short_name TEXT NOT NULL
+	route_id TEXT PRIMARY KEY,
+	agency_id TEXT,
+	route_short_name TEXT NOT NULL,
+	route_long_name TEXT,
+	route_type TEXT
 );
 
-CREATE INDEX IF NOT EXISTS gtfs_routes_short_name_idx ON gtfs_routes (short_name);
-
-CREATE TABLE IF NOT EXISTS gtfs_route_aliases (
-	short_name TEXT NOT NULL,
-	gtfs_route_id TEXT NOT NULL REFERENCES gtfs_routes (gtfs_route_id) ON DELETE CASCADE,
-	PRIMARY KEY (short_name, gtfs_route_id)
-);
+CREATE INDEX IF NOT EXISTS gtfs_routes_short_name_idx ON gtfs_routes (route_short_name);
 
 CREATE TABLE IF NOT EXISTS gtfs_stops (
 	stop_id TEXT PRIMARY KEY,
-	name TEXT NOT NULL,
-	name_normalized TEXT NOT NULL,
-	latitude DOUBLE PRECISION,
-	longitude DOUBLE PRECISION
+	stop_name TEXT NOT NULL,
+	stop_lat DOUBLE PRECISION,
+	stop_lon DOUBLE PRECISION
 );
 
-CREATE INDEX IF NOT EXISTS gtfs_stops_name_idx ON gtfs_stops (name);
-CREATE INDEX IF NOT EXISTS gtfs_stops_name_normalized_idx ON gtfs_stops (name_normalized);
+CREATE INDEX IF NOT EXISTS gtfs_stops_name_idx ON gtfs_stops (stop_name);
 
 CREATE TABLE IF NOT EXISTS gtfs_calendar (
 	service_id TEXT PRIMARY KEY,
-	start_date TEXT NOT NULL,
-	end_date TEXT NOT NULL,
-	sunday TEXT NOT NULL,
 	monday TEXT NOT NULL,
 	tuesday TEXT NOT NULL,
 	wednesday TEXT NOT NULL,
 	thursday TEXT NOT NULL,
 	friday TEXT NOT NULL,
-	saturday TEXT NOT NULL
+	saturday TEXT NOT NULL,
+	sunday TEXT NOT NULL,
+	start_date TEXT NOT NULL,
+	end_date TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS gtfs_calendar_dates (
 	service_id TEXT NOT NULL,
-	service_date TEXT NOT NULL,
+	date TEXT NOT NULL,
 	exception_type TEXT NOT NULL,
-	PRIMARY KEY (service_id, service_date)
+	PRIMARY KEY (service_id, date)
 );
 
 CREATE TABLE IF NOT EXISTS gtfs_trips (
 	trip_id TEXT PRIMARY KEY,
-	gtfs_route_id TEXT NOT NULL REFERENCES gtfs_routes (gtfs_route_id) ON DELETE CASCADE,
+	route_id TEXT NOT NULL REFERENCES gtfs_routes (route_id) ON DELETE CASCADE,
 	service_id TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS gtfs_trips_route_idx ON gtfs_trips (gtfs_route_id);
+CREATE INDEX IF NOT EXISTS gtfs_trips_route_idx ON gtfs_trips (route_id);
 
+-- pickup_type, drop_off_type, timepoint는 CSV에 있으나 조회에 안 쓰고 609만 행이라 생략
 CREATE TABLE IF NOT EXISTS gtfs_stop_times (
 	trip_id TEXT NOT NULL REFERENCES gtfs_trips (trip_id) ON DELETE CASCADE,
+	arrival_time TEXT NOT NULL,
+	departure_time TEXT NOT NULL,
 	stop_id TEXT NOT NULL,
 	stop_sequence INTEGER NOT NULL,
-	arrival_seconds INTEGER NOT NULL,
-	departure_seconds INTEGER NOT NULL,
 	PRIMARY KEY (trip_id, stop_sequence)
 );
 
 CREATE INDEX IF NOT EXISTS gtfs_stop_times_trip_idx ON gtfs_stop_times (trip_id, stop_sequence);
+
+ALTER TABLE gtfs_routes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gtfs_stops ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gtfs_calendar ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gtfs_calendar_dates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gtfs_trips ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gtfs_stop_times ENABLE ROW LEVEL SECURITY;

@@ -16,7 +16,8 @@
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run",
 		"ci": "npm run check && npm run lint && npm run knip && npm test",
-		"gtfs:load-slice": "npx --yes vite-node src/lib/adapters/gtfs/load-gtfs-slice.cli.ts"
+		"gtfs:load-slice": "npx --yes vite-node src/lib/adapters/gtfs/load-gtfs-slice.cli.ts",
+		"gtfs:filter-seoul-seongnam": "npx --yes vite-node src/lib/adapters/gtfs/filter-gtfs-seoul-seongnam.cli.ts"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",

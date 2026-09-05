@@ -4,7 +4,7 @@ import { loadGtfsSliceFromDirectory } from '$lib/adapters/gtfs/load-gtfs-slice';
 const directory = process.env.GTFS_DIR?.trim();
 
 if (!directory) {
-	console.error('GTFS_DIR is required to load the corridor slice');
+	console.error('GTFS_DIR is required to load GTFS CSV into DATABASE_URL');
 	process.exit(1);
 }
 
