@@ -1,8 +1,10 @@
 import { createReadStream, existsSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { join } from 'node:path';
+import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import postgres from 'postgres';
+import { parseCsvLine, stripBom } from '$lib/adapters/gtfs/gtfs-csv';
 import { forEachCsvRow } from '$lib/adapters/gtfs/gtfs-csv-reader';
 import { GTFS_REQUIRED_FILES } from '$lib/adapters/gtfs/gtfs-timetable';
 import { query } from '$lib/server/db';
@@ -26,16 +28,8 @@ const TABLE_COLUMNS: Record<string, readonly string[]> = {
 	],
 	gtfs_calendar_dates: ['service_id', 'date', 'exception_type'],
 	gtfs_trips: ['route_id', 'service_id', 'trip_id'],
-	gtfs_stop_times: [
-		'trip_id',
-		'arrival_time',
-		'departure_time',
-		'stop_id',
-		'stop_sequence',
-		'pickup_type',
-		'drop_off_type',
-		'timepoint'
-	]
+	// pickup_type, drop_off_type, timepoint는 조회에 없고 609만 행이라 적재하지 않음
+	gtfs_stop_times: ['trip_id', 'arrival_time', 'departure_time', 'stop_id', 'stop_sequence']
 };
 
 const COPY_ORDER: { file: string; table: string; required: boolean }[] = [
@@ -78,7 +72,9 @@ function assertRequiredFiles(directory: string): void {
 }
 
 async function countRows(table: string): Promise<number> {
-	const row = await query<{ count: string | number }>(`SELECT count(*)::int AS count FROM ${table}`);
+	const row = await query<{ count: string | number }>(
+		`SELECT count(*)::int AS count FROM ${table}`
+	);
 	return Number(row[0]?.count ?? 0);
 }
 
@@ -86,6 +82,7 @@ async function loadWithCopy(directory: string, databaseUrl: string): Promise<voi
 	const sql = postgres(databaseUrl, { max: 1, prepare: false, ssl: 'require' });
 
 	try {
+		await sql.unsafe('SET statement_timeout TO 0');
 		await sql.unsafe(
 			'TRUNCATE gtfs_stop_times, gtfs_trips, gtfs_calendar_dates, gtfs_calendar, gtfs_stops, gtfs_routes'
 		);
@@ -107,10 +104,10 @@ async function loadWithCopy(directory: string, databaseUrl: string): Promise<voi
 			}
 
 			const columnSql = columns.map((column) => quoteIdent(column)).join(', ');
-			const writable = await sql.unsafe(
-				`COPY ${target.table} (${columnSql}) FROM STDIN WITH (FORMAT csv, HEADER true)`
-			).writable();
-			await pipeline(createReadStream(filePath), writable);
+			const writable = await sql
+				.unsafe(`COPY ${target.table} (${columnSql}) FROM STDIN WITH (FORMAT csv, HEADER true)`)
+				.writable();
+			await pipeline(createReadStream(filePath), csvColumnSubsetTransform(columns), writable);
 			console.info('GTFS CSV copied', { file: target.file, columns });
 		}
 	} finally {
@@ -165,7 +162,10 @@ async function loadWithInserts(directory: string): Promise<void> {
 	}
 }
 
-async function csvHeadersInTable(filePath: string, tableColumns: readonly string[]): Promise<string[]> {
+async function csvHeadersInTable(
+	filePath: string,
+	tableColumns: readonly string[]
+): Promise<string[]> {
 	const headerLine = await readFirstLine(filePath);
 	const allowed = new Set(tableColumns);
 	return headerLine
@@ -191,6 +191,59 @@ async function readFirstLine(filePath: string): Promise<string> {
 	}
 
 	return '';
+}
+
+function csvColumnSubsetTransform(columns: readonly string[]): Transform {
+	let headerDone = false;
+	let columnIndexes: number[] = [];
+	let leftover = '';
+
+	function mapLine(raw: string): string | null {
+		const line = stripBom(raw).replace(/\r$/, '');
+
+		if (line.trim().length === 0) {
+			return null;
+		}
+
+		const fields = parseCsvLine(line);
+
+		if (!headerDone) {
+			headerDone = true;
+			const headers = fields.map((header) => header.trim());
+			columnIndexes = columns.map((column) => {
+				const index = headers.indexOf(column);
+
+				if (index < 0) {
+					throw new Error(`CSV is missing column ${column}`);
+				}
+
+				return index;
+			});
+			return columns.join(',');
+		}
+
+		return columnIndexes.map((index) => fields[index] ?? '').join(',');
+	}
+
+	return new Transform({
+		transform(chunk, _encoding, callback) {
+			leftover += chunk.toString('utf8');
+			const lines = leftover.split('\n');
+			leftover = lines.pop() ?? '';
+			const mapped = lines.map(mapLine).filter((line): line is string => line !== null);
+
+			callback(null, mapped.length > 0 ? `${mapped.join('\n')}\n` : '');
+		},
+		flush(callback) {
+			if (leftover.trim().length === 0) {
+				callback();
+				return;
+			}
+
+			const mapped = mapLine(leftover);
+			callback(null, mapped ? `${mapped}\n` : '');
+		}
+	});
 }
 
 function quoteIdent(name: string): string {

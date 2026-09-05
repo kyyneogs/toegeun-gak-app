@@ -4,6 +4,7 @@ import { MockRouteProvider } from '$lib/adapters/mock/mock-route-provider';
 import { RecommendationApplicationService } from '$lib/application/recommendation/recommendation-service';
 import { TripApplicationService } from '$lib/application/trip/trip-service';
 import { isKakaoRestKeyConfigured } from '$lib/constants/kakao';
+import { localGtfsDirectory } from '$lib/constants/gtfs-paths';
 import type { RouteCriterion } from '$lib/domain/recommendation/criteria';
 import type { RecommendationResult } from '$lib/domain/recommendation/types';
 import {
@@ -24,7 +25,7 @@ export async function runServerRecommendation(input: {
 	criterion?: RouteCriterion;
 }): Promise<RecommendationResult> {
 	const restKey = env.KAKAO_REST_API_KEY?.trim() ?? '';
-	const gtfsDir = env.GTFS_DIR?.trim() ?? '';
+	const gtfsDir = localGtfsDirectory(env.GTFS_DIR);
 	const provider = isKakaoRestKeyConfigured(restKey)
 		? getServerKakaoRouteProvider(restKey, gtfsDir)
 		: new MockRouteProvider();

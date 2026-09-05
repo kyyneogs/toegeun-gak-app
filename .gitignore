@@ -52,4 +52,5 @@ Thumbs.db
 # Local database (PGlite) for accounts, commits, ranking, and push
 .data/
 /data/gtfs/
+/data/gtfs-seoul-seongnam/
 /data/**/*.zip

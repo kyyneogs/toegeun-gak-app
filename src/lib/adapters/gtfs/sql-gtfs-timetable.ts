@@ -66,7 +66,9 @@ type SqlRouteRow = {
 
 export async function hasSqlGtfsSlice(): Promise<boolean> {
 	try {
-		const row = await queryOne<{ ok: number }>('SELECT 1 AS ok FROM gtfs_routes LIMIT 1');
+		const row = await queryOne<{ ok: number }>(
+			'SELECT 1 AS ok FROM gtfs_routes WHERE route_short_name IS NOT NULL LIMIT 1'
+		);
 		return Boolean(row);
 	} catch (cause) {
 		console.error('SQL GTFS lookup failed', cause);
@@ -159,9 +161,7 @@ export class SqlGtfsTimetable implements TimetablePort {
 		}
 
 		const normalized = normalizeStopName(trimmed);
-		const byNormalized = stops.filter(
-			(stop) => normalizeStopName(stop.stop_name) === normalized
-		);
+		const byNormalized = stops.filter((stop) => normalizeStopName(stop.stop_name) === normalized);
 
 		if (byNormalized.length > 0) {
 			return byNormalized;
@@ -185,9 +185,7 @@ export class SqlGtfsTimetable implements TimetablePort {
 
 	private async routeIdsByShortName(): Promise<Map<string, string[]>> {
 		if (!this.routesPromise) {
-			this.routesPromise = query<SqlRouteRow>(
-				'SELECT route_id, route_short_name FROM gtfs_routes'
-			)
+			this.routesPromise = query<SqlRouteRow>('SELECT route_id, route_short_name FROM gtfs_routes')
 				.then((rows) => {
 					const map = new Map<string, string[]>();
 
