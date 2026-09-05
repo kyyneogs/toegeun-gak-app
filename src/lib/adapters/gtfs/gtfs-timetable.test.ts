@@ -5,6 +5,7 @@ import {
 	GtfsTimetable,
 	tryCreateGtfsTimetable
 } from '$lib/adapters/gtfs/gtfs-timetable';
+import { GTFS_SEOUL_SEONGNAM_DIR } from '$lib/constants/gtfs-paths';
 import { combineLocalDateAndClock, formatClock } from '$lib/utils/time';
 import { describe, expect, it } from 'vitest';
 
@@ -168,6 +169,17 @@ describe('tryCreateGtfsTimetable', () => {
 
 	it('opens a folder that has the required CSV files', () => {
 		expect(tryCreateGtfsTimetable(FIXTURE_DIR)).toBeInstanceOf(GtfsTimetable);
+	});
+
+	it('opens the Seoul-Seongnam slice when that folder exists', async () => {
+		const timetable = tryCreateGtfsTimetable(GTFS_SEOUL_SEONGNAM_DIR);
+
+		if (!timetable) {
+			return;
+		}
+
+		const points = await timetable.findStopCoordinates('판교역');
+		expect(points.length).toBeGreaterThan(0);
 	});
 });
 

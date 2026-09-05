@@ -1,5 +1,4 @@
 import { join } from 'node:path';
-import { PGlite } from '@electric-sql/pglite';
 import postgres from 'postgres';
 import { APP_SCHEMA_SQL } from '$lib/server/schema';
 
@@ -101,6 +100,8 @@ async function createClient(): Promise<DatabaseClient> {
 		return client;
 	}
 
+	// Vercel 번들에 PGlite를 넣지 않습니다. 로컬·테스트만 동적 적재합니다.
+	const { PGlite } = await import('@electric-sql/pglite');
 	const dataDir =
 		process.env.VITEST === 'true' || process.env.NODE_ENV === 'test'
 			? undefined

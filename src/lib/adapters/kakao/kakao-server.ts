@@ -65,6 +65,7 @@ class SelectingTimetable implements TimetablePort {
 		const fileTimetable = tryCreateGtfsTimetable(this.gtfsDir);
 
 		if (fileTimetable) {
+			console.info('GTFS timetable: local CSV', { directory: this.gtfsDir });
 			this.inner = fileTimetable;
 			return this.inner;
 		}

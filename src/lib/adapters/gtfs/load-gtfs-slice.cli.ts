@@ -1,12 +1,8 @@
 import { resolve } from 'node:path';
 import { loadGtfsSliceFromDirectory } from '$lib/adapters/gtfs/load-gtfs-slice';
+import { localGtfsDirectory } from '$lib/constants/gtfs-paths';
 
-const directory = process.env.GTFS_DIR?.trim();
-
-if (!directory) {
-	console.error('GTFS_DIR is required to load GTFS CSV into DATABASE_URL');
-	process.exit(1);
-}
+const directory = localGtfsDirectory(process.env.GTFS_DIR);
 
 if (!process.env.DATABASE_URL?.trim()) {
 	console.error('DATABASE_URL is required; do not load a nationwide feed onto Vercel disk');
