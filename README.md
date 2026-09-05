@@ -29,7 +29,7 @@ cp .env.example .env
 npm run dev
 ```
 
-카카오 콘솔의 JavaScript SDK 도메인에 개발 주소와 배포 주소를 등록하세요. `http://` 또는 `https://`를 포함한 호스트:포트가 필요합니다. 예: `http://localhost:5173`. Vercel 프로젝트 `toegeun-gak-app`(팀 noname-8398)은 `https://toegeun-gak-app.vercel.app`과 미리보기 호스트(`https://toegeun-gak-app-git-cursor-gtfs-csv-schema-s-a9b2cd-noname-8398.vercel.app` 등)를 각각 넣습니다. 와일드카드가 안 되면 URL을 각각 넣습니다.
+카카오 콘솔의 JavaScript SDK 도메인에 개발 주소와 배포 주소를 등록하세요. `http://` 또는 `https://`를 포함한 호스트:포트가 필요합니다. 예: `http://localhost:5174`. Vercel 프로젝트 `toegeun-gak-app`(팀 noname-8398)은 `https://toegeun-gak-app.vercel.app`과 미리보기 호스트(`https://toegeun-gak-app-git-cursor-gtfs-csv-schema-s-a9b2cd-noname-8398.vercel.app` 등)를 각각 넣습니다. 와일드카드가 안 되면 URL을 각각 넣습니다.
 
 ## 환경 변수
 
