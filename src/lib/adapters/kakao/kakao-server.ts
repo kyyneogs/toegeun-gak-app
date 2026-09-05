@@ -28,7 +28,7 @@ export function getServerKakaoRouteProvider(
 
 class SelectingTimetable implements TimetablePort {
 	private inner: TimetablePort | null = null;
-	private sqlReady = false;
+	private resolvePromise: Promise<TimetablePort> | null = null;
 
 	constructor(private readonly gtfsDir: string) {}
 
@@ -47,18 +47,24 @@ class SelectingTimetable implements TimetablePort {
 	}
 
 	private async resolve(): Promise<TimetablePort> {
-		if (this.sqlReady && this.inner) {
+		if (this.inner) {
 			return this.inner;
 		}
 
+		if (!this.resolvePromise) {
+			this.resolvePromise = this.createTimetable().catch((cause) => {
+				this.resolvePromise = null;
+				throw cause;
+			});
+		}
+
+		return this.resolvePromise;
+	}
+
+	private async createTimetable(): Promise<TimetablePort> {
 		if (await hasSqlGtfsSlice()) {
 			console.info('GTFS timetable: SQL corridor slice');
 			this.inner = new SqlGtfsTimetable();
-			this.sqlReady = true;
-			return this.inner;
-		}
-
-		if (this.inner) {
 			return this.inner;
 		}
 

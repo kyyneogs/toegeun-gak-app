@@ -79,14 +79,22 @@ export async function hasSqlGtfsSlice(): Promise<boolean> {
 export class SqlGtfsTimetable implements TimetablePort {
 	private routesPromise: Promise<Map<string, string[]>> | null = null;
 	private stopsPromise: Promise<SqlStopRow[]> | null = null;
+	private readonly routeIdsByCandidate = new Map<string, Promise<string[]>>();
+	private readonly stopMatchesByName = new Map<string, Promise<SqlStopRow[]>>();
+	private readonly activeTripsByRouteAndDate = new Map<string, Promise<SqlTripRow[]>>();
+	private readonly calendarsByServiceSet = new Map<
+		string,
+		Promise<Map<string, GtfsCalendarWindow>>
+	>();
+	private readonly exceptionsByServiceSetAndDate = new Map<string, Promise<Map<string, string>>>();
 	private readonly stopTimesByTrip = new Map<string, StopTimePoint[]>();
 
 	async prepare(routeIds: string[], serviceDate: Date): Promise<void> {
-		const trips: SqlTripRow[] = [];
-
-		for (const routeId of routeIds) {
-			trips.push(...(await this.activeTripsForRoute(routeId, serviceDate)));
-		}
+		const trips = (
+			await Promise.all(
+				[...new Set(routeIds)].map((routeId) => this.activeTripsForRoute(routeId, serviceDate))
+			)
+		).flat();
 
 		await this.ensureStopTimes(trips.map((trip) => trip.trip_id));
 	}
@@ -152,6 +160,22 @@ export class SqlGtfsTimetable implements TimetablePort {
 	}
 
 	private async matchStops(stopName: string): Promise<SqlStopRow[]> {
+		const cacheKey = stopName.trim();
+		const cached = this.stopMatchesByName.get(cacheKey);
+
+		if (cached) {
+			return cached;
+		}
+
+		const pending = this.loadMatchedStops(stopName).catch((cause) => {
+			this.stopMatchesByName.delete(cacheKey);
+			throw cause;
+		});
+		this.stopMatchesByName.set(cacheKey, pending);
+		return pending;
+	}
+
+	private async loadMatchedStops(stopName: string): Promise<SqlStopRow[]> {
 		const stops = await this.ensureStops();
 		const trimmed = stopName.trim();
 		const exact = stops.filter((stop) => stop.stop_name === trimmed);
@@ -215,6 +239,22 @@ export class SqlGtfsTimetable implements TimetablePort {
 	}
 
 	private async activeTripsForRoute(routeId: string, serviceDate: Date): Promise<SqlTripRow[]> {
+		const cacheKey = `${toGtfsDate(serviceDate)}:${routeId}`;
+		const cached = this.activeTripsByRouteAndDate.get(cacheKey);
+
+		if (cached) {
+			return cached;
+		}
+
+		const pending = this.loadActiveTripsForRoute(routeId, serviceDate).catch((cause) => {
+			this.activeTripsByRouteAndDate.delete(cacheKey);
+			throw cause;
+		});
+		this.activeTripsByRouteAndDate.set(cacheKey, pending);
+		return pending;
+	}
+
+	private async loadActiveTripsForRoute(routeId: string, serviceDate: Date): Promise<SqlTripRow[]> {
 		const gtfsRouteIds = await this.resolveRouteIds(routeId);
 
 		if (gtfsRouteIds.length === 0) {
@@ -232,8 +272,8 @@ export class SqlGtfsTimetable implements TimetablePort {
 		}
 
 		const serviceIds = [...new Set(trips.map((trip) => trip.service_id))];
-		const calendars = await loadCalendars(serviceIds);
-		const exceptions = await loadExceptions(serviceIds, serviceDate);
+		const calendars = await this.loadCalendars(serviceIds);
+		const exceptions = await this.loadExceptions(serviceIds, serviceDate);
 		const active: SqlTripRow[] = [];
 
 		for (const trip of trips) {
@@ -252,6 +292,22 @@ export class SqlGtfsTimetable implements TimetablePort {
 	}
 
 	private async resolveRouteIds(candidateRouteId: string): Promise<string[]> {
+		const cacheKey = candidateRouteId.trim();
+		const cached = this.routeIdsByCandidate.get(cacheKey);
+
+		if (cached) {
+			return cached;
+		}
+
+		const pending = this.loadRouteIds(candidateRouteId).catch((cause) => {
+			this.routeIdsByCandidate.delete(cacheKey);
+			throw cause;
+		});
+		this.routeIdsByCandidate.set(cacheKey, pending);
+		return pending;
+	}
+
+	private async loadRouteIds(candidateRouteId: string): Promise<string[]> {
 		const shortName = extractRouteShortName(candidateRouteId);
 		const byShortName = await this.routeIdsByShortName();
 
@@ -269,6 +325,38 @@ export class SqlGtfsTimetable implements TimetablePort {
 		);
 
 		return byId ? [candidateRouteId] : [];
+	}
+
+	private loadCalendars(serviceIds: string[]): Promise<Map<string, GtfsCalendarWindow>> {
+		const cacheKey = serviceSetKey(serviceIds);
+		const cached = this.calendarsByServiceSet.get(cacheKey);
+
+		if (cached) {
+			return cached;
+		}
+
+		const pending = loadCalendars(serviceIds).catch((cause) => {
+			this.calendarsByServiceSet.delete(cacheKey);
+			throw cause;
+		});
+		this.calendarsByServiceSet.set(cacheKey, pending);
+		return pending;
+	}
+
+	private loadExceptions(serviceIds: string[], serviceDate: Date): Promise<Map<string, string>> {
+		const cacheKey = `${toGtfsDate(serviceDate)}:${serviceSetKey(serviceIds)}`;
+		const cached = this.exceptionsByServiceSetAndDate.get(cacheKey);
+
+		if (cached) {
+			return cached;
+		}
+
+		const pending = loadExceptions(serviceIds, serviceDate).catch((cause) => {
+			this.exceptionsByServiceSetAndDate.delete(cacheKey);
+			throw cause;
+		});
+		this.exceptionsByServiceSetAndDate.set(cacheKey, pending);
+		return pending;
 	}
 
 	private async ensureStopTimes(tripIds: string[]): Promise<void> {
@@ -359,6 +447,10 @@ function inClause(values: string[]): { sql: string; params: string[] } {
 		sql: values.map((_, index) => `$${index + 1}`).join(', '),
 		params: values
 	};
+}
+
+function serviceSetKey(serviceIds: string[]): string {
+	return [...new Set(serviceIds)].sort().join('|');
 }
 
 function secondsSinceServiceStart(at: Date, serviceDate: Date): number {

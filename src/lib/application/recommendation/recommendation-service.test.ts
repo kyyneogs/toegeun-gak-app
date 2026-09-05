@@ -31,6 +31,7 @@ function makeRoute(clock: string, totalMinutes: number): TransitRoute {
 
 class ScriptedRouteProvider implements RouteProvider {
 	calls = 0;
+	attachedRoutes: TransitRoute[][] = [];
 
 	constructor(
 		private readonly routes: TransitRoute[],
@@ -45,6 +46,10 @@ class ScriptedRouteProvider implements RouteProvider {
 		}
 
 		return this.routes;
+	}
+
+	async attachHeadwayLoss(routes: TransitRoute[]): Promise<void> {
+		this.attachedRoutes.push(routes);
 	}
 }
 
@@ -79,6 +84,16 @@ describe('RecommendationApplicationService', () => {
 		expect(result.criterion).toBe('earliestArrival');
 		expect(formatClock(new Date(result.naiveArrivalAt))).toBe('19:20');
 		expect(result.alternatives).toHaveLength(4);
+	});
+
+	it('calculates headway loss only for the selected route', async () => {
+		const slow = makeRoute('19:20', 80);
+		const fast = makeRoute('18:40', 40);
+		const provider = new ScriptedRouteProvider([slow, fast]);
+
+		await recommendWith(provider);
+
+		expect(provider.attachedRoutes).toEqual([[fast]]);
 	});
 
 	it('keeps the first route when arrivals are equal', async () => {

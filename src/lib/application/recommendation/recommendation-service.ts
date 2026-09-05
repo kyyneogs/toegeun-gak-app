@@ -51,8 +51,7 @@ export class RecommendationApplicationService implements RecommendationService {
 			throw new AppError(ERROR_CODES.ROUTE_NOT_FOUND);
 		}
 
-		const alternativeRoutes = alternativesFor(candidates).map((item) => item.route);
-		await this.routeProvider.attachHeadwayLoss?.(uniqueRoutes([winner, ...alternativeRoutes]));
+		await this.routeProvider.attachHeadwayLoss?.([winner]);
 
 		return {
 			id: createId('rec'),
@@ -102,22 +101,6 @@ function toAlternatives(routes: TransitRoute[]): RouteAlternative[] {
 		criterion: item.criterion,
 		route: toRecommendedRoute(item.route)
 	}));
-}
-
-function uniqueRoutes(routes: TransitRoute[]): TransitRoute[] {
-	const seen = new Set<string>();
-	const unique: TransitRoute[] = [];
-
-	for (const route of routes) {
-		if (seen.has(route.routeId)) {
-			continue;
-		}
-
-		seen.add(route.routeId);
-		unique.push(route);
-	}
-
-	return unique;
 }
 
 function tripPoints(input: RecommendationInput) {
