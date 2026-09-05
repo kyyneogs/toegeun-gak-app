@@ -61,7 +61,7 @@ npm run gtfs:load-slice
 
 zip·원본 피드는 git과 Vercel 함수 디스크에 올리지 마세요.
 
-`vercel.json` Cron은 1분마다 `GET /api/cron/standup`을 호출합니다. Hobby 플랜은 Cron이 하루 한 번만 돌 수 있습니다. 헤더는 `Authorization: Bearer ${CRON_SECRET}`입니다.
+`vercel.json` Cron은 **매일 23:00 UTC**(한국 시간 다음날 08:00)에 `GET /api/cron/standup`을 호출합니다. Hobby는 하루 한 번만 허용해서 1분 간격은 쓰지 않습니다. 헤더는 `Authorization: Bearer ${CRON_SECRET}`입니다.
 
 추천 API `maxDuration`은 Hobby 한도(10초)입니다. 카카오+SQL이 길면 Pro에서 올립니다.
 
