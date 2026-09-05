@@ -52,9 +52,22 @@ export function isUniqueViolation(cause: unknown): boolean {
 	return record.code === '23505' || Boolean(record.message?.toLowerCase().includes('unique'));
 }
 
+const DROP_LEGACY_GTFS_SQL = `
+DROP TABLE IF EXISTS gtfs_stop_times CASCADE;
+DROP TABLE IF EXISTS gtfs_trips CASCADE;
+DROP TABLE IF EXISTS gtfs_calendar_dates CASCADE;
+DROP TABLE IF EXISTS gtfs_calendar CASCADE;
+DROP TABLE IF EXISTS gtfs_stops CASCADE;
+DROP TABLE IF EXISTS gtfs_route_aliases CASCADE;
+DROP TABLE IF EXISTS gtfs_routes CASCADE;
+`.trim();
+
 async function getClient(): Promise<DatabaseClient> {
 	if (!clientPromise) {
-		clientPromise = createClient();
+		clientPromise = createClient().catch((cause) => {
+			clientPromise = null;
+			throw cause;
+		});
 	}
 
 	return clientPromise;
@@ -81,6 +94,7 @@ async function createClient(): Promise<DatabaseClient> {
 		};
 
 		if (!process.env.VERCEL) {
+			await dropLegacyGtfsTablesIfNeeded(client);
 			await applySchema(client);
 		}
 
@@ -102,8 +116,30 @@ async function createClient(): Promise<DatabaseClient> {
 			await pglite.exec(sqlText);
 		}
 	};
-	await client.exec(APP_SCHEMA_SQL);
+	await dropLegacyGtfsTablesIfNeeded(client);
+	await applySchema(client);
 	return client;
+}
+
+async function dropLegacyGtfsTablesIfNeeded(client: DatabaseClient): Promise<void> {
+	try {
+		const columns = await client.query<{ column_name: string }>(
+			`SELECT column_name
+			 FROM information_schema.columns
+			 WHERE table_name = 'gtfs_routes'
+			   AND column_name IN ('gtfs_route_id', 'route_short_name')`
+		);
+		const names = new Set(columns.map((row) => row.column_name));
+
+		if (!names.has('gtfs_route_id') || names.has('route_short_name')) {
+			return;
+		}
+
+		console.warn('Dropping legacy GTFS tables that do not match CSV column names');
+		await client.exec(DROP_LEGACY_GTFS_SQL);
+	} catch (cause) {
+		console.error('GTFS schema compatibility check failed', cause);
+	}
 }
 
 async function applySchema(client: DatabaseClient): Promise<void> {
