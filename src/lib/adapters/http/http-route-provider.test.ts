@@ -120,6 +120,34 @@ describe('HttpRouteProvider', () => {
 		expect(live?.provider).toBe('kakao');
 	});
 
+	it('asks the transit API for a live route without scheduling', async () => {
+		const fetchImpl: typeof fetch = async (_input, init) => {
+			const body = JSON.parse(String(init?.body));
+			expect(body.liveOnly).toBe(true);
+			return new Response(
+				JSON.stringify({
+					liveRoute: {
+						provider: 'kakao',
+						routeId: 'live',
+						totalTimeSeconds: 1,
+						movingTimeSeconds: 1,
+						waitingTimeSeconds: 0,
+						walkingTimeSeconds: 0,
+						transferCount: 0,
+						departureAt: REQUEST.departureAt.toISOString(),
+						arrivalAt: REQUEST.departureAt.toISOString(),
+						sections: []
+					},
+					routes: []
+				}),
+				{ status: 200, headers: { 'Content-Type': 'application/json' } }
+			);
+		};
+
+		const live = await new HttpRouteProvider(fetchImpl).findLiveRoute(REQUEST);
+		expect(live?.provider).toBe('kakao');
+	});
+
 	it('maps 429 without exposing the response body', async () => {
 		const fetchImpl: typeof fetch = async () =>
 			new Response(JSON.stringify({ message: 'secret quota' }), { status: 429 });

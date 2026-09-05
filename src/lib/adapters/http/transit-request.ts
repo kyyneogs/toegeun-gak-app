@@ -35,3 +35,7 @@ export function parseTransitRequest(body: unknown): RouteRequest | null {
 
 	return { origin, destination, departureAt };
 }
+
+export function isLiveOnlyTransitRequest(body: unknown): boolean {
+	return isRecord(body) && body.liveOnly === true;
+}

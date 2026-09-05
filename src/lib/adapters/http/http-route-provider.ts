@@ -49,7 +49,8 @@ export class HttpRouteProvider implements RouteProvider {
 		const payload = await this.postSearch({
 			origin: request.origin,
 			destination: request.destination,
-			departureAt: new Date()
+			departureAt: new Date(),
+			liveOnly: true
 		});
 		const liveRoute = payload.liveRoute ?? null;
 		this.liveRoutes.set(key, liveRoute);
@@ -71,7 +72,9 @@ export class HttpRouteProvider implements RouteProvider {
 		return routes;
 	}
 
-	private async postSearch(request: RouteRequest): Promise<TransitSearchResponse> {
+	private async postSearch(
+		request: RouteRequest & { liveOnly?: boolean }
+	): Promise<TransitSearchResponse> {
 		let response: Response;
 
 		try {
@@ -81,7 +84,8 @@ export class HttpRouteProvider implements RouteProvider {
 				body: JSON.stringify({
 					origin: request.origin,
 					destination: request.destination,
-					departureAt: request.departureAt.toISOString()
+					departureAt: request.departureAt.toISOString(),
+					liveOnly: request.liveOnly === true ? true : undefined
 				})
 			});
 		} catch (cause) {
