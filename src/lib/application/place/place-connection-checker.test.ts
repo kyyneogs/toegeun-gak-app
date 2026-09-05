@@ -46,7 +46,7 @@ describe('PlaceConnectionChecker', () => {
 
 		expect(result.ok).toBe(true);
 		expect(result.backend).toBe('kakao');
-		expect(result.message).toContain('검색 결과가 없습니다');
+		expect(result.message).toContain('검색 결과가 없어요');
 	});
 
 	it('reports Kakao failure without exposing internals', async () => {

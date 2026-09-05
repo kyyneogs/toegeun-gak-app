@@ -1,5 +1,6 @@
 import {
 	KAKAO_ROUTE_CONNECTED_MESSAGE,
+	KAKAO_ROUTE_EMPTY_PROBE_MESSAGE,
 	KAKAO_ROUTE_FAILURE_MESSAGE,
 	KAKAO_ROUTE_KEY_CONFIGURED_MESSAGE,
 	KAKAO_ROUTE_MOCK_CONNECTION_MESSAGE,
@@ -67,7 +68,7 @@ export class RouteConnectionChecker implements RouteConnectionService {
 					backend: 'kakao',
 					ok: true,
 					verified: true,
-					message: `${KAKAO_ROUTE_CONNECTED_MESSAGE} 프로브 경로 결과는 비어 있습니다.`
+					message: `${KAKAO_ROUTE_CONNECTED_MESSAGE} ${KAKAO_ROUTE_EMPTY_PROBE_MESSAGE}`
 				};
 			}
 

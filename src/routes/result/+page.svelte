@@ -2,101 +2,161 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import SkeletonBlock from '$lib/components/SkeletonBlock.svelte';
+	import LoadingStatus from '$lib/components/LoadingStatus.svelte';
 	import WaitComparison from '$lib/components/WaitComparison.svelte';
 	import { scheduleRouteCopy } from '$lib/constants/kakao';
-	import { STAND_UP_BOARD_LABEL, STAND_UP_WALK_LABEL } from '$lib/constants/recommendation';
+	import {
+		ARRIVE_BY_RESULT_HELPER,
+		COMMIT_CTA_LABEL,
+		COMMIT_DONE_LABEL,
+		COMMIT_NEED_ACCOUNT,
+		PUSH_IOS_HINT,
+		CRITERION_SECTION_LABEL,
+		OVERTIME_SECTION_LABEL,
+		OVERTIME_TEN_LABEL,
+		OVERTIME_THIRTY_LABEL,
+		RESULT_ERROR_TITLE,
+		RESULT_NAV_TITLE,
+		RESULT_RETRY_CTA,
+		RESULT_ROUTE_CTA,
+		RESULT_TOTAL_LABEL,
+		RESULT_WAIT_LABEL,
+		RESULT_WALK_LABEL,
+		STAND_UP_BOARD_LABEL,
+		STAND_UP_WALK_LABEL,
+		criterionLabel,
+		resultArrivalCopy,
+		resultSavedCopy
+	} from '$lib/constants/recommendation';
+	import { savedArrivalSeconds } from '$lib/domain/commit/saved-time';
+	import { ROUTE_CRITERIA, type RouteCriterion } from '$lib/domain/recommendation/criteria';
+	import { sessionStore } from '$lib/stores/session.svelte';
 	import { tripSession } from '$lib/stores/trip-session.svelte';
 	import { standUpStartsWithWalk, transitLineLabel } from '$lib/utils/route-label';
 	import { formatClock, formatDurationMinutes, fromIso } from '$lib/utils/time';
+
+	const recommended = $derived(tripSession.displayedRecommended());
+	const committed = $derived(sessionStore.hasCommitFor(tripSession.result?.id ?? null));
+	const savedSeconds = $derived(
+		recommended && tripSession.result
+			? savedArrivalSeconds(recommended.expectedArrivalAt, tripSession.result.naiveArrivalAt)
+			: 0
+	);
+	const savedCopy = $derived(resultSavedCopy(savedSeconds));
 
 	$effect(() => {
 		if (tripSession.status === 'idle') {
 			void goto(resolve('/'));
 		}
 	});
+
+	function chooseCriterion(criterion: RouteCriterion): void {
+		tripSession.selectCriterion(criterion);
+	}
+
+	function commitRoute(): void {
+		void sessionStore.commitCurrentRecommendation();
+	}
 </script>
 
 <header class="nav-row">
 	<a class="nav-link" href={resolve('/')} onclick={() => tripSession.resetResult()}>← 홈</a>
-	<h1 class="nav-title">오늘의 퇴근각</h1>
+	<h1 class="nav-title">{RESULT_NAV_TITLE}</h1>
 	<span></span>
 </header>
 
 {#if tripSession.status === 'calculating'}
-	<p class="status-copy">오늘의 퇴근각을 계산하고 있습니다.</p>
+	<LoadingStatus />
 	<SkeletonBlock lines={4} />
 {:else if tripSession.status === 'error'}
-	<p class="large-title error-title">지금은 추천할 수 없어요</p>
-	<p class="status-copy">{tripSession.errorMessage}</p>
-	<button class="primary-button" type="button" onclick={() => goto(resolve('/'))}
-		>다시 입력하기</button
-	>
-{:else if tripSession.result && tripSession.trip}
-	{@const recommended = tripSession.result.recommended}
+	<div class="error-block">
+		<p class="large-title error-title">{RESULT_ERROR_TITLE}</p>
+		<p class="status-copy">{tripSession.errorMessage}</p>
+		<button class="primary-button" type="button" onclick={() => goto(resolve('/'))}
+			>{RESULT_RETRY_CTA}</button
+		>
+	</div>
+{:else if recommended && tripSession.result && tripSession.trip}
 	{@const recommendedLine = transitLineLabel(recommended.route.sections)}
 	{@const standUpWalk = standUpStartsWithWalk(recommended.route.sections)}
 	{@const standUpLabel = standUpWalk ? STAND_UP_WALK_LABEL : STAND_UP_BOARD_LABEL}
-	{@const firstRide = recommended.chosenTrips[0]}
+	{@const arrivalClock = formatClock(fromIso(recommended.expectedArrivalAt))}
 
 	<section class="predicted">
 		<p class="hero-time">{formatClock(fromIso(recommended.departureAt))}</p>
 		<p class="hero-label">{standUpLabel}</p>
-		<p class="hero-route">{recommendedLine}</p>
-		<p class="hero-arrival">{formatClock(fromIso(recommended.expectedArrivalAt))} 도착</p>
-		<p class="helper predicted-copy">{scheduleRouteCopy(tripSession.result.scheduleSource)}</p>
-		{#if tripSession.explanation}
-			<p class="summary">{tripSession.explanation.summary}</p>
+		<p class="hero-arrival">{resultArrivalCopy(recommendedLine, arrivalClock)}</p>
+		{#if savedCopy}
+			<p class="helper predicted-copy">{savedCopy}</p>
 		{/if}
-
-		<section class="card stats">
-			<p class="route-line">{tripSession.trip.origin.name} → {tripSession.trip.destination.name}</p>
-			<div class="stat-row">
-				<span>{standUpWalk ? '일어나서 걷기' : '승차'}</span>
-				<strong>{formatClock(fromIso(recommended.departureAt))}</strong>
-			</div>
-			<div class="stat-row">
-				<span>이용 노선</span>
-				<strong>{recommendedLine}</strong>
-			</div>
-			{#if firstRide && standUpWalk}
-				<div class="stat-row">
-					<span>승차</span>
-					<strong>{formatClock(fromIso(firstRide.boardTime))}</strong>
-				</div>
-			{/if}
-			<div class="stat-row">
-				<span>예상 도착</span>
-				<strong>{formatClock(fromIso(recommended.expectedArrivalAt))}</strong>
-			</div>
-			<div class="stat-row">
-				<span>예상 소요시간</span>
-				<strong>{formatDurationMinutes(recommended.totalTimeSeconds)}</strong>
-			</div>
-			<div class="stat-row">
-				<span>예상 도보시간</span>
-				<strong>{formatDurationMinutes(recommended.walkingTimeSeconds)}</strong>
-			</div>
-			{#if recommended.waitingTimeSeconds > 0}
-				<div class="stat-row">
-					<span>예상 대기시간</span>
-					<strong>{formatDurationMinutes(recommended.waitingTimeSeconds)}</strong>
-				</div>
-			{/if}
-		</section>
+		<p class="helper predicted-copy">{scheduleRouteCopy(tripSession.result.scheduleSource)}</p>
+		{#if tripSession.result.mode === 'arriveBy' && tripSession.selectedCriterion === 'latestDeparture'}
+			<p class="helper predicted-copy">{ARRIVE_BY_RESULT_HELPER}</p>
+		{/if}
 
 		{#if recommended.headwayLoss}
 			<WaitComparison loss={recommended.headwayLoss} />
 		{/if}
 
-		{#if tripSession.explanation}
-			<div class="card reasons">
-				{#each tripSession.explanation.details as detail, index (index)}
-					<p>{detail}</p>
+		<section class="card stats">
+			<p class="route-line">{tripSession.trip.origin.name} → {tripSession.trip.destination.name}</p>
+			<div class="stat-row">
+				<span>{RESULT_WALK_LABEL}</span>
+				<strong>{formatDurationMinutes(recommended.walkingTimeSeconds)}</strong>
+			</div>
+			{#if recommended.waitingTimeSeconds > 0}
+				<div class="stat-row">
+					<span>{RESULT_WAIT_LABEL}</span>
+					<strong>{formatDurationMinutes(recommended.waitingTimeSeconds)}</strong>
+				</div>
+			{/if}
+			<div class="stat-row">
+				<span>{RESULT_TOTAL_LABEL}</span>
+				<strong>{formatDurationMinutes(recommended.totalTimeSeconds)}</strong>
+			</div>
+		</section>
+
+		<section class="criteria">
+			<p class="section-label">{CRITERION_SECTION_LABEL}</p>
+			<div class="chip-row">
+				{#each ROUTE_CRITERIA as criterion (criterion)}
+					<button
+						class="chip"
+						class:active={tripSession.selectedCriterion === criterion}
+						type="button"
+						onclick={() => chooseCriterion(criterion)}
+					>
+						{criterionLabel(criterion)}
+					</button>
 				{/each}
 			</div>
-		{/if}
+		</section>
 
-		<a class="primary-button link-button" href={resolve('/result/route')}>이 경로 보기</a>
+		<section class="overtime">
+			<p class="section-label">{OVERTIME_SECTION_LABEL}</p>
+			<div class="chip-row">
+				<button class="chip" type="button" onclick={() => tripSession.delayDeparture(10)}
+					>{OVERTIME_TEN_LABEL}</button
+				>
+				<button class="chip" type="button" onclick={() => tripSession.delayDeparture(30)}
+					>{OVERTIME_THIRTY_LABEL}</button
+				>
+			</div>
+		</section>
+
+		<a class="primary-button link-button" href={resolve('/result/route')}>{RESULT_ROUTE_CTA}</a>
+		{#if committed}
+			<p class="helper predicted-copy">{COMMIT_DONE_LABEL}</p>
+			<p class="helper predicted-copy">{PUSH_IOS_HINT}</p>
+		{:else if !sessionStore.user}
+			<p class="helper predicted-copy">{COMMIT_NEED_ACCOUNT}</p>
+			<a class="ghost-button" href={resolve('/login')}>{COMMIT_CTA_LABEL}</a>
+		{:else}
+			<button class="ghost-button" type="button" onclick={commitRoute}>{COMMIT_CTA_LABEL}</button>
+		{/if}
+		{#if sessionStore.errorMessage}
+			<p class="helper predicted-copy">{sessionStore.errorMessage}</p>
+		{/if}
 	</section>
 {/if}
 
@@ -108,25 +168,14 @@
 		line-height: 1.4;
 	}
 
-	.hero-route {
-		margin: 4px 0 0;
-		color: var(--color-label);
-		font-size: 17px;
+	.hero-label {
+		margin: 10px 0 8px;
+		color: var(--color-text);
+		font-size: 20px;
 		font-weight: 600;
+		letter-spacing: -0.02em;
 		text-align: center;
-	}
-
-	.hero-arrival {
-		margin: 4px 0 8px;
-		color: var(--color-secondary-label);
-		font-size: 17px;
-		font-weight: 600;
-		text-align: center;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.predicted-copy {
-		text-align: center;
+		animation: rise-in var(--duration-enter) var(--ease-out) 80ms both;
 	}
 
 	.hero-time {
@@ -137,28 +186,28 @@
 		line-height: 1;
 		text-align: center;
 		font-variant-numeric: tabular-nums;
+		animation: hero-pop var(--duration-hero-pop) var(--ease-spring) both;
 	}
 
-	.hero-label,
-	.summary {
+	.hero-arrival {
+		margin: 4px 0 8px;
+		color: var(--color-secondary-label);
+		font-size: 17px;
+		font-weight: 600;
+		text-align: center;
+		font-variant-numeric: tabular-nums;
+		animation: rise-in var(--duration-enter) var(--ease-out) 120ms both;
+	}
+
+	.error-block {
+		animation: fade-in var(--duration-enter) var(--ease-out) both;
+	}
+
+	.predicted-copy {
 		text-align: center;
 	}
 
-	.hero-label {
-		margin: 8px 0 8px;
-		color: var(--color-label);
-		font-size: 17px;
-	}
-
-	.summary {
-		margin: 0 0 24px;
-		color: var(--color-secondary-label);
-		font-size: 17px;
-		line-height: 1.45;
-	}
-
-	.stats,
-	.reasons {
+	.stats {
 		padding: 16px;
 		margin-bottom: 8px;
 	}
@@ -180,11 +229,6 @@
 		font-variant-numeric: tabular-nums;
 	}
 
-	.reasons p {
-		margin: 0 0 10px;
-		color: var(--color-secondary-label);
-	}
-
 	.error-title {
 		font-size: 28px;
 	}
@@ -195,5 +239,32 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+	}
+
+	.criteria,
+	.overtime {
+		margin: 16px 0;
+	}
+
+	.chip-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+
+	.chip {
+		min-height: 36px;
+		padding: 0 12px;
+		border: 0.5px solid var(--color-separator);
+		border-radius: var(--radius-pill);
+		background: var(--color-card);
+		color: var(--color-text);
+		font-size: 14px;
+	}
+
+	.chip.active {
+		background: var(--color-accent);
+		border-color: var(--color-accent);
+		color: #fff;
 	}
 </style>

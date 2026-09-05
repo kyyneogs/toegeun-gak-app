@@ -1,6 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { getAppServices } from '$lib/application/composition';
+	import {
+		CONNECTION_CHECK_AGAIN,
+		CONNECTION_CHECKING_COPY,
+		CONNECTION_CHECKING_LABEL,
+		CONNECTION_FAILED_COPY
+	} from '$lib/constants/recommendation';
 	import type { RouteConnectionResult } from '$lib/ports/route-connection';
 
 	interface Props {
@@ -25,7 +31,7 @@
 			result = {
 				backend: 'kakao',
 				ok: false,
-				message: '연결 상태를 확인하지 못했습니다.'
+				message: CONNECTION_FAILED_COPY
 			};
 		} finally {
 			status = 'idle';
@@ -43,7 +49,7 @@
 	);
 	const label = $derived(
 		status === 'checking'
-			? '확인 중'
+			? CONNECTION_CHECKING_LABEL
 			: result?.backend === 'mock'
 				? 'Mock'
 				: result?.ok
@@ -62,7 +68,7 @@
 	{#if !compact || (result && !result.ok)}
 		<p class="helper">
 			{#if status === 'checking' && !compact}
-				연결을 확인하는 중입니다.
+				{CONNECTION_CHECKING_COPY}
 			{:else if result}
 				{result.message}
 				{#if result.sampleRouteName}
@@ -78,7 +84,7 @@
 			disabled={status === 'checking'}
 			onclick={() => runCheck(true)}
 		>
-			다시 확인
+			{CONNECTION_CHECK_AGAIN}
 		</button>
 	{/if}
 </div>

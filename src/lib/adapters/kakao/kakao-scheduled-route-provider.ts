@@ -24,6 +24,7 @@ import type { RouteRequest, TransitRoute } from '$lib/domain/route/route';
 import type { RouteProvider } from '$lib/ports/route-provider';
 import type { TimetablePort } from '$lib/ports/timetable-port';
 import { closestPoint, placePairKey, walkingSecondsBetween, type GeoPoint } from '$lib/utils/geo';
+import { fromIso } from '$lib/utils/time';
 
 interface CachedTopology {
 	topologies: TopologyRoute[];
@@ -85,6 +86,29 @@ export class KakaoScheduledRouteProvider implements RouteProvider {
 
 		await attachHeadwayLoss(routes, request.departureAt, this.timetable);
 		return routes;
+	}
+
+	async attachHeadwayLoss(routes: TransitRoute[]): Promise<void> {
+		if (routes.length === 0) {
+			return;
+		}
+
+		const first = routes[0];
+
+		if (!first) {
+			return;
+		}
+
+		const serviceDate = fromIso(first.departureAt);
+		await Promise.all(
+			routes.map(async (route) => {
+				if (route.headwayLoss !== undefined) {
+					return;
+				}
+
+				route.headwayLoss = await measureHeadwayLoss(route, serviceDate, this.timetable);
+			})
+		);
 	}
 
 	private loadTopology(
@@ -184,18 +208,12 @@ async function attachAccessWalks(
 		return topology;
 	}
 
-	const startsWithWalk = topology.segments[0]?.type === 'WALK';
-	const endsWithWalk = topology.segments[topology.segments.length - 1]?.type === 'WALK';
 	const firstTransit = firstTransitSegment(topology);
 	const lastTransit = lastTransitSegment(topology);
 
 	const [toFirstStopSeconds, fromLastStopSeconds] = await Promise.all([
-		!startsWithWalk && firstTransit
-			? walkSecondsToNamedStop(origin, firstTransit.stopId, timetable)
-			: null,
-		!endsWithWalk && lastTransit
-			? walkSecondsToNamedStop(destination, lastTransit.alightStopId, timetable)
-			: null
+		firstTransit ? walkSecondsToNamedStop(origin, firstTransit.stopId, timetable) : null,
+		lastTransit ? walkSecondsToNamedStop(destination, lastTransit.alightStopId, timetable) : null
 	]);
 
 	return withAccessWalks(

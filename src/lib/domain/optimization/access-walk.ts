@@ -10,24 +10,40 @@ export function withAccessWalks(
 	const segments = [...topology.segments];
 	const first = segments[0];
 
-	if (first && first.type !== 'WALK' && toFirstStopSeconds && toFirstStopSeconds > 0) {
-		segments.unshift({
-			type: 'WALK',
-			duration: toFirstStopSeconds,
-			startPlaceName: originName,
-			endPlaceName: first.startPlaceName
-		});
+	if (toFirstStopSeconds && toFirstStopSeconds > 0 && first) {
+		if (first.type === 'WALK') {
+			segments[0] = {
+				...first,
+				duration: toFirstStopSeconds,
+				startPlaceName: originName
+			};
+		} else {
+			segments.unshift({
+				type: 'WALK',
+				duration: toFirstStopSeconds,
+				startPlaceName: originName,
+				endPlaceName: first.startPlaceName
+			});
+		}
 	}
 
 	const last = segments[segments.length - 1];
 
-	if (last && last.type !== 'WALK' && fromLastStopSeconds && fromLastStopSeconds > 0) {
-		segments.push({
-			type: 'WALK',
-			duration: fromLastStopSeconds,
-			startPlaceName: last.endPlaceName,
-			endPlaceName: destinationName
-		});
+	if (fromLastStopSeconds && fromLastStopSeconds > 0 && last) {
+		if (last.type === 'WALK') {
+			segments[segments.length - 1] = {
+				...last,
+				duration: fromLastStopSeconds,
+				endPlaceName: destinationName
+			};
+		} else {
+			segments.push({
+				type: 'WALK',
+				duration: fromLastStopSeconds,
+				startPlaceName: last.endPlaceName,
+				endPlaceName: destinationName
+			});
+		}
 	}
 
 	return { segments };

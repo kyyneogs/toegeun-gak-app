@@ -1,6 +1,6 @@
-import { AdaptiveRouteProvider } from '$lib/adapters/http/adaptive-route-provider';
 import { MemoryCachedRouteProvider } from '$lib/adapters/http/cached-route-provider';
 import { fetchTransitStatus, HttpRouteProvider } from '$lib/adapters/http/http-route-provider';
+import { HttpRecommendationService } from '$lib/adapters/http/http-recommendation-service';
 import { KakaoPlaceProvider } from '$lib/adapters/kakao/kakao-place-provider';
 import { MockPlaceProvider } from '$lib/adapters/mock/mock-place-provider';
 import { MockRouteProvider } from '$lib/adapters/mock/mock-route-provider';
@@ -36,7 +36,6 @@ export interface AppServices {
 export interface AppServiceOverrides {
 	placeProvider?: PlaceService;
 	placeBackendKind?: PlaceBackendKind;
-	routeProvider?: RouteProvider;
 	routeConnection?: RouteConnectionService;
 	storage?: StoragePort;
 	explanationService?: ExplanationService;
@@ -46,7 +45,6 @@ export function createAppServices(overrides: AppServiceOverrides = {}): AppServi
 	const backendKind = overrides.placeBackendKind ?? resolvePlaceBackendKind();
 	const placeProvider = overrides.placeProvider ?? createPlaceProvider(backendKind);
 	const placeService = new PlaceApplicationService(placeProvider);
-	const routeProvider = overrides.routeProvider ?? createDefaultRouteProvider();
 	const storage = overrides.storage ?? createDefaultStorage();
 
 	return {
@@ -54,7 +52,7 @@ export function createAppServices(overrides: AppServiceOverrides = {}): AppServi
 		placeConnection: new PlaceConnectionChecker(backendKind, placeService),
 		routeConnection: overrides.routeConnection ?? createDefaultRouteConnection(),
 		tripService: new TripApplicationService(),
-		recommendationService: new RecommendationApplicationService(routeProvider),
+		recommendationService: createDefaultRecommendation(),
 		explanationService: overrides.explanationService ?? new RuleBasedExplanationService(),
 		storage
 	};
@@ -96,16 +94,12 @@ function createPlaceProvider(backendKind: PlaceBackendKind): PlaceService {
 	return new MockPlaceProvider();
 }
 
-function createDefaultRouteProvider(): RouteProvider {
+function createDefaultRecommendation(): RecommendationService {
 	if (typeof window === 'undefined') {
-		return new MockRouteProvider();
+		return new RecommendationApplicationService(new MockRouteProvider());
 	}
 
-	return new AdaptiveRouteProvider(
-		getSharedLiveRouteProvider(),
-		new MockRouteProvider(),
-		fetchTransitStatus
-	);
+	return new HttpRecommendationService();
 }
 
 function createDefaultRouteConnection(): RouteConnectionService {

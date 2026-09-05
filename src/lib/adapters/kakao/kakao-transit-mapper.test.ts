@@ -124,6 +124,35 @@ describe('kakao transit mapper', () => {
 		expect(topologies[0]?.segments.map((segment) => segment.type)).toEqual(['BUS']);
 	});
 
+	it('raises short Kakao walks to one minute instead of showing 0분', () => {
+		const topologies = mapKakaoRoutesToTopologies(
+			{
+				status: 'OK',
+				routes: [
+					{
+						steps: [
+							{ properties: { type: 'WALKING', time: 12, stops: [] } },
+							{
+								properties: {
+									type: 'BUS',
+									time: 800,
+									stops: [{ name: '송현초등학교' }, { name: '성남시청후면' }],
+									vehicles: [{ name: '341' }]
+								}
+							},
+							{ properties: { type: 'WALKING', time: 8, stops: [] } }
+						]
+					}
+				]
+			},
+			'회사',
+			'집'
+		);
+
+		expect(topologies[0]?.segments[0]).toMatchObject({ type: 'WALK', duration: 60 });
+		expect(topologies[0]?.segments[2]).toMatchObject({ type: 'WALK', duration: 60 });
+	});
+
 	it('maps the first complete Kakao route for the live snapshot, including Kakao times', () => {
 		const template = mapKakaoRouteToLiveTemplate(PAYLOAD, '회사', '집');
 

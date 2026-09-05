@@ -192,6 +192,126 @@ a.primary-button {
 	color: var(--color-label);
 }
 
+.field-block:has(.search.open) {
+	position: relative;
+	z-index: 12;
+}
+
 .spacer {
 	flex: 1;
+}
+
+@keyframes rise-in {
+	from {
+		opacity: 0;
+		transform: translateY(12px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes fade-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes hero-pop {
+	from {
+		opacity: 0;
+		transform: scale(0.86);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	@keyframes rise-in {
+		from,
+		to {
+			opacity: 1;
+			transform: none;
+		}
+	}
+
+	@keyframes fade-in {
+		from,
+		to {
+			opacity: 1;
+		}
+	}
+
+	@keyframes hero-pop {
+		from,
+		to {
+			opacity: 1;
+			transform: none;
+		}
+	}
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+	animation-duration: var(--duration-page);
+	animation-timing-function: var(--ease-out);
+}
+
+html[data-nav='forward']::view-transition-old(root) {
+	animation-name: page-out-left;
+}
+
+html[data-nav='forward']::view-transition-new(root) {
+	animation-name: page-in-right;
+}
+
+html[data-nav='back']::view-transition-old(root) {
+	animation-name: page-out-right;
+}
+
+html[data-nav='back']::view-transition-new(root) {
+	animation-name: page-in-left;
+}
+
+@keyframes page-in-right {
+	from {
+		transform: translateX(100%);
+	}
+	to {
+		transform: translateX(0);
+	}
+}
+
+@keyframes page-out-left {
+	to {
+		transform: translateX(-28%);
+	}
+}
+
+@keyframes page-in-left {
+	from {
+		transform: translateX(-28%);
+	}
+	to {
+		transform: translateX(0);
+	}
+}
+
+@keyframes page-out-right {
+	to {
+		transform: translateX(100%);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	::view-transition-old(root),
+	::view-transition-new(root) {
+		animation: none;
+	}
 }

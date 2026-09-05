@@ -1,3 +1,4 @@
+import { MIN_WALK_DURATION_SECONDS } from '$lib/constants/walk';
 import {
 	closestPoint,
 	distanceMeters,
@@ -34,7 +35,9 @@ describe('walking distance', () => {
 		const far = { latitude: 37.42, longitude: 127.13 };
 
 		expect(closestPoint(origin, [far, nearby])).toEqual(nearby);
+		expect(walkingSecondsBetween(origin, nearby)).toBe(MIN_WALK_DURATION_SECONDS);
 		expect(walkingSecondsBetween(origin, nearby)).toBeLessThan(walkingSecondsBetween(origin, far));
+		expect(walkingSecondsBetween(origin, origin)).toBe(0);
 		expect(distanceMeters(origin, nearby)).toBeGreaterThan(0);
 	});
 });

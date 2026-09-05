@@ -36,7 +36,7 @@ describe('withAccessWalks', () => {
 		});
 	});
 
-	it('keeps Kakao walks instead of doubling them', () => {
+	it('keeps Kakao walks when access time was not measured', () => {
 		const topology = withAccessWalks(
 			{
 				segments: [
@@ -64,12 +64,49 @@ describe('withAccessWalks', () => {
 			},
 			'회사',
 			'집',
-			999,
-			999
+			null,
+			null
 		);
 
 		expect(topology.segments).toHaveLength(3);
 		expect(topology.segments[0]).toMatchObject({ type: 'WALK', duration: 120 });
 		expect(topology.segments[2]).toMatchObject({ type: 'WALK', duration: 60 });
+	});
+
+	it('replaces Kakao access walks with measured duration instead of stacking another walk', () => {
+		const topology = withAccessWalks(
+			{
+				segments: [
+					{
+						type: 'WALK',
+						duration: 10,
+						startPlaceName: '회사',
+						endPlaceName: '정류장'
+					},
+					{
+						type: 'BUS',
+						stopId: '판교역',
+						alightStopId: '강남역',
+						candidateRouteIds: ['5001'],
+						startPlaceName: '판교역',
+						endPlaceName: '강남역'
+					},
+					{
+						type: 'WALK',
+						duration: 5,
+						startPlaceName: '강남역',
+						endPlaceName: '집'
+					}
+				]
+			},
+			'회사',
+			'집',
+			8 * 60,
+			3 * 60
+		);
+
+		expect(topology.segments).toHaveLength(3);
+		expect(topology.segments[0]).toMatchObject({ type: 'WALK', duration: 480 });
+		expect(topology.segments[2]).toMatchObject({ type: 'WALK', duration: 180 });
 	});
 });

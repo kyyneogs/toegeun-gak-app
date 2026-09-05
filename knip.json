@@ -1,4 +1,6 @@
 {
 	"$schema": "https://unpkg.com/knip@5/schema.json",
-	"ignoreExportsUsedInFile": true
+	"ignoreExportsUsedInFile": true,
+	"ignore": ["static/sw.js"],
+	"ignoreBinaries": ["vite-node"]
 }

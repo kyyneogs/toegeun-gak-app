@@ -31,14 +31,14 @@ export class PlaceConnectionChecker implements PlaceConnectionService {
 				return {
 					backend: 'mock',
 					ok: false,
-					message: 'Mock 장소 검색이 비어 있습니다.'
+					message: 'Mock 장소 검색이 비어 있어요.'
 				};
 			}
 
 			return {
 				backend: 'mock',
 				ok: true,
-				message: 'Kakao 키가 없어 Mock 장소 검색을 사용 중입니다.',
+				message: 'Kakao 키가 없어 Mock 장소 검색을 쓰고 있어요.',
 				samplePlaceName: places[0].name
 			};
 		} catch (cause) {
@@ -46,7 +46,7 @@ export class PlaceConnectionChecker implements PlaceConnectionService {
 			return {
 				backend: 'mock',
 				ok: false,
-				message: 'Mock 장소 검색을 확인하지 못했습니다.'
+				message: 'Mock 장소 검색을 확인하지 못했어요.'
 			};
 		}
 	}
@@ -59,14 +59,14 @@ export class PlaceConnectionChecker implements PlaceConnectionService {
 				return {
 					backend: 'kakao',
 					ok: true,
-					message: 'Kakao에 연결됐지만 검색 결과가 없습니다. 사이트 도메인 등록을 확인하세요.'
+					message: 'Kakao에 연결됐지만 검색 결과가 없어요. 사이트 도메인 등록을 확인해 주세요.'
 				};
 			}
 
 			return {
 				backend: 'kakao',
 				ok: true,
-				message: 'Kakao 장소 검색에 연결되었습니다.',
+				message: 'Kakao 장소 검색에 연결됐어요.',
 				samplePlaceName: places[0].name
 			};
 		} catch (cause) {

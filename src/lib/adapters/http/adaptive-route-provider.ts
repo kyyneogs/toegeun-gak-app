@@ -28,6 +28,11 @@ export class AdaptiveRouteProvider implements RouteProvider {
 		return provider.findLiveRoute(request);
 	}
 
+	async attachHeadwayLoss(routes: TransitRoute[]): Promise<void> {
+		const provider = await this.resolve();
+		await provider.attachHeadwayLoss?.(routes);
+	}
+
 	private async resolve(): Promise<RouteProvider> {
 		if (this.resolved) {
 			return this.resolved;

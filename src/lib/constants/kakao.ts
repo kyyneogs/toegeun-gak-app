@@ -18,24 +18,26 @@ export const KAKAO_ROUTE_PROBE_DESTINATION = {
 };
 
 export const KAKAO_CONNECTION_FAILURE_MESSAGE =
-	'Kakao 장소 검색에 연결하지 못했습니다. 앱 > 플랫폼 키 > JavaScript 키 > JavaScript SDK 도메인에 http://호스트:포트를 등록하세요. 링크 연동 허용과는 다른 설정입니다. 카카오맵 사용 설정도 ON이어야 합니다.';
+	'Kakao 장소 검색에 연결하지 못했어요. 앱 > 플랫폼 키 > JavaScript 키 > JavaScript SDK 도메인에 http://호스트:포트를 등록해 주세요. 링크 연동 허용과는 다른 설정이에요. 카카오맵 사용 설정도 켜져 있어야 해요.';
 
 export const KAKAO_ROUTE_MOCK_CONNECTION_MESSAGE =
-	'Kakao REST 키가 없어 Mock 경로를 사용 중입니다. 실제 버스·지하철 시각표가 아닙니다.';
+	'Kakao REST 키가 없어 Mock 경로를 쓰고 있어요. 실제 버스·지하철 시각표가 아니에요.';
 
 export const KAKAO_ROUTE_KEY_CONFIGURED_MESSAGE =
-	'Kakao 대중교통 경로가 설정되어 있습니다. 실제 경로 검색은 설정에서 다시 확인하세요.';
+	'Kakao 대중교통 경로가 설정되어 있어요. 실제 경로 검색은 설정에서 다시 확인해 주세요.';
 
 export const KAKAO_ROUTE_CONNECTED_MESSAGE =
-	'Kakao 대중교통 경로에 연결되었습니다. 퇴근각은 GTFS 정적 시각표입니다.';
+	'Kakao 대중교통 경로에 연결됐어요. 퇴근각은 GTFS 정적 시각표예요.';
 
 export const KAKAO_ROUTE_FAILURE_MESSAGE =
-	'Kakao 대중교통 경로에 연결하지 못했습니다. REST API 키와 카카오맵 사용 설정을 확인하세요.';
+	'Kakao 대중교통 경로에 연결하지 못했어요. REST API 키와 카카오맵 사용 설정을 확인해 주세요.';
 
 export const KAKAO_ROUTE_NETWORK_FAILURE_MESSAGE =
-	'Kakao 서버에 연결하지 못했습니다. 네트워크를 확인하세요.';
+	'Kakao 서버에 연결하지 못했어요. 네트워크를 확인해 주세요.';
 
-export const KAKAO_GTFS_ROUTE_COPY = 'GTFS 정적 시각표입니다. 실시간 도착이 아닙니다.';
+export const KAKAO_ROUTE_EMPTY_PROBE_MESSAGE = '프로브 경로 결과는 비어 있어요.';
+
+export const KAKAO_GTFS_ROUTE_COPY = '시간표 기준이에요. 실시간은 아니에요.';
 
 export function scheduleRouteCopy(source: ScheduleSource | undefined): string {
 	void source;

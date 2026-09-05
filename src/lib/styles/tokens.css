@@ -8,6 +8,8 @@
 	--color-secondary-label: #636366;
 	--color-accent: #007aff;
 	--color-accent-pressed: #0066d6;
+	--color-on-accent: #ffffff;
+	--color-on-accent-muted: rgb(255 255 255 / 0.82);
 	--color-separator: #c6c6c8;
 	--color-fill: #e5e5ea;
 	--color-fill-strong: #d1d1d6;
@@ -31,10 +33,30 @@
 	--shadow-card: 0 1px 2px rgb(0 0 0 / 0.04);
 	--hero-size: clamp(56px, 16vw, 80px);
 	--app-max-width: 430px;
+	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+	--ease-spring: cubic-bezier(0.22, 1.15, 0.36, 1);
+	--duration-enter: 480ms;
+	--duration-splash: 640ms;
+	--duration-splash-hold: 1100ms;
+	--duration-splash-fade: 400ms;
+	--duration-page: 320ms;
+	--duration-count: 400ms;
+	--duration-hero-pop: 560ms;
+	--duration-shimmer: 1.4s;
+	--duration-breathe: 1.6s;
 }
 
 @media (prefers-reduced-motion: reduce) {
 	:root {
 		--motion: 0ms;
+		--duration-enter: 0ms;
+		--duration-splash: 0ms;
+		--duration-splash-hold: 0ms;
+		--duration-splash-fade: 0ms;
+		--duration-page: 0ms;
+		--duration-count: 0ms;
+		--duration-hero-pop: 0ms;
+		--duration-shimmer: 0ms;
+		--duration-breathe: 0ms;
 	}
 }

@@ -1,4 +1,4 @@
-import { ERROR_CODES } from '$lib/constants/errors';
+import { ERROR_CODES, ERROR_DEPARTURE_WINDOW, ERROR_DESIRED_ARRIVAL } from '$lib/constants/errors';
 import { DEFAULT_DEPARTURE_WINDOW_MINUTES } from '$lib/constants/recommendation';
 import { AppError } from '$lib/domain/errors';
 import type { CreateTripInput, Trip } from '$lib/domain/trip/trip';
@@ -29,20 +29,14 @@ export class TripApplicationService implements TripService {
 			input.departureUntil ?? addMinutes(input.departureFrom, DEFAULT_DEPARTURE_WINDOW_MINUTES);
 
 		if (departureUntil.getTime() < input.departureFrom.getTime()) {
-			throw new AppError(
-				ERROR_CODES.INVALID_REQUEST,
-				'퇴근 가능 종료 시간이 시작 시간보다 빠릅니다.'
-			);
+			throw new AppError(ERROR_CODES.INVALID_REQUEST, ERROR_DEPARTURE_WINDOW);
 		}
 
 		if (
 			input.desiredArrivalAt &&
 			input.desiredArrivalAt.getTime() <= input.departureFrom.getTime()
 		) {
-			throw new AppError(
-				ERROR_CODES.INVALID_REQUEST,
-				'도착 희망 시간은 출발 가능 시간 이후여야 합니다.'
-			);
+			throw new AppError(ERROR_CODES.INVALID_REQUEST, ERROR_DESIRED_ARRIVAL);
 		}
 
 		const now = toIso(new Date());

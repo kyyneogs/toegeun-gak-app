@@ -15,14 +15,16 @@
 		"knip": "knip",
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run",
-		"ci": "npm run check && npm run lint && npm run knip && npm test"
+		"ci": "npm run check && npm run lint && npm run knip && npm test",
+		"gtfs:load-slice": "npx --yes vite-node src/lib/adapters/gtfs/load-gtfs-slice.cli.ts"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
-		"@sveltejs/adapter-auto": "^7.0.1",
+		"@sveltejs/adapter-vercel": "^6.3.4",
 		"@sveltejs/kit": "^2.63.0",
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
 		"@types/node": "^24",
+		"@types/web-push": "^3.6.4",
 		"eslint": "^10.4.1",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.19.0",
@@ -36,5 +38,10 @@
 		"typescript-eslint": "^8.60.1",
 		"vite": "^8.0.16",
 		"vitest": "^4.1.8"
+	},
+	"dependencies": {
+		"@electric-sql/pglite": "^0.5.8",
+		"postgres": "^3.4.9",
+		"web-push": "^3.6.7"
 	}
 }

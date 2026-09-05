@@ -133,28 +133,64 @@ export class MockRouteProvider implements RouteProvider {
 			}
 		];
 
+		const primary: TransitRoute = {
+			provider: 'mock',
+			routeId: createId('route'),
+			totalTimeSeconds,
+			movingTimeSeconds,
+			waitingTimeSeconds,
+			walkingTimeSeconds,
+			transferCount: 0,
+			departureAt: toIso(leaveAt),
+			arrivalAt: toIso(destArrival),
+			sections,
+			headwayLoss: mockHeadwayLoss({
+				routeId: this.routeName,
+				destArrival,
+				busDeparture,
+				firstBus,
+				lastBus,
+				intervalMinutes: this.busIntervalMinutes,
+				busRideMinutes: this.busRideMinutes,
+				walkToDestMinutes: this.walkToDestMinutes
+			})
+		};
+
+		const laterLeave = addMinutes(leaveAt, 12);
+		const walkHeavyArrival = addMinutes(destArrival, 8);
+		const transferArrival = addMinutes(destArrival, 18);
+
 		return [
+			primary,
 			{
-				provider: 'mock',
+				...primary,
 				routeId: createId('route'),
-				totalTimeSeconds,
-				movingTimeSeconds,
-				waitingTimeSeconds,
-				walkingTimeSeconds,
+				walkingTimeSeconds: walkingTimeSeconds + 12 * 60,
+				totalTimeSeconds: secondsBetween(laterLeave, destArrival),
 				transferCount: 0,
-				departureAt: toIso(leaveAt),
+				departureAt: toIso(laterLeave),
 				arrivalAt: toIso(destArrival),
-				sections,
-				headwayLoss: mockHeadwayLoss({
-					routeId: this.routeName,
-					destArrival,
-					busDeparture,
-					firstBus,
-					lastBus,
-					intervalMinutes: this.busIntervalMinutes,
-					busRideMinutes: this.busRideMinutes,
-					walkToDestMinutes: this.walkToDestMinutes
-				})
+				headwayLoss: null
+			},
+			{
+				...primary,
+				routeId: createId('route'),
+				walkingTimeSeconds: Math.max(60, walkingTimeSeconds - 4 * 60),
+				totalTimeSeconds: secondsBetween(leaveAt, walkHeavyArrival),
+				transferCount: 1,
+				departureAt: toIso(leaveAt),
+				arrivalAt: toIso(walkHeavyArrival),
+				headwayLoss: null
+			},
+			{
+				...primary,
+				routeId: createId('route'),
+				walkingTimeSeconds,
+				totalTimeSeconds: secondsBetween(leaveAt, transferArrival),
+				transferCount: 2,
+				departureAt: toIso(leaveAt),
+				arrivalAt: toIso(transferArrival),
+				headwayLoss: null
 			}
 		];
 	}

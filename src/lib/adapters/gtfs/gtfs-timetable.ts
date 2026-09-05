@@ -1,11 +1,23 @@
 import { existsSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
+import '$lib/adapters/gtfs/gtfs-client-guard';
 import { forEachCsvRow } from '$lib/adapters/gtfs/gtfs-csv-reader';
 import { loadStopTimesForTrips } from '$lib/adapters/gtfs/gtfs-stop-times';
+import { nextBoardAndAlight, type StopTimePoint } from '$lib/adapters/gtfs/gtfs-board-alight';
+import {
+	calendarDateKey,
+	GTFS_CALENDAR_DAY_COLUMNS,
+	GTFS_EXCEPTION_ADDED,
+	GTFS_EXCEPTION_REMOVED,
+	isCalendarServiceActive,
+	toGtfsDate,
+	type GtfsCalendarWindow
+} from '$lib/adapters/gtfs/gtfs-calendar';
 import {
 	extractRouteShortName,
 	isStopNameMatch,
-	normalizeStopName
+	normalizeStopName,
+	routeShortNameKeys
 } from '$lib/adapters/gtfs/gtfs-match';
 import type { TripChoice } from '$lib/domain/optimization/types';
 import type { NextTripQuery, TimetablePort } from '$lib/ports/timetable-port';
@@ -21,23 +33,6 @@ export const GTFS_REQUIRED_FILES = [
 ] as const;
 
 const CALENDAR_DATES_FILE = 'calendar_dates.txt';
-const CALENDAR_DAY_COLUMNS = [
-	'sunday',
-	'monday',
-	'tuesday',
-	'wednesday',
-	'thursday',
-	'friday',
-	'saturday'
-] as const;
-const EXCEPTION_ADDED = '1';
-const EXCEPTION_REMOVED = '2';
-
-interface CalendarService {
-	startDate: string;
-	endDate: string;
-	days: readonly string[];
-}
 
 interface TripRecord {
 	tripId: string;
@@ -45,19 +40,12 @@ interface TripRecord {
 	routeId: string;
 }
 
-interface StopTimePoint {
-	stopId: string;
-	sequence: number;
-	arrivalSeconds: number;
-	departureSeconds: number;
-}
-
 interface GtfsIndex {
 	routeIdsByShortName: Map<string, string[]>;
 	stopIdsByExactName: Map<string, string[]>;
 	stopIdsByNormalizedName: Map<string, string[]>;
 	tripsByRouteId: Map<string, TripRecord[]>;
-	calendarByServiceId: Map<string, CalendarService>;
+	calendarByServiceId: Map<string, GtfsCalendarWindow>;
 	calendarDateExceptions: Map<string, string>;
 	coordinatesByStopId: Map<string, GeoPoint>;
 }
@@ -290,7 +278,7 @@ async function loadGtfsIndex(directory: string): Promise<GtfsIndex> {
 	const stopIdsByExactName = new Map<string, string[]>();
 	const stopIdsByNormalizedName = new Map<string, string[]>();
 	const tripsByRouteId = new Map<string, TripRecord[]>();
-	const calendarByServiceId = new Map<string, CalendarService>();
+	const calendarByServiceId = new Map<string, GtfsCalendarWindow>();
 	const calendarDateExceptions = new Map<string, string>();
 	const coordinatesByStopId = new Map<string, GeoPoint>();
 
@@ -301,10 +289,8 @@ async function loadGtfsIndex(directory: string): Promise<GtfsIndex> {
 			return;
 		}
 
-		pushMapValue(routeIdsByShortName, shortName, row.route_id);
-
-		if (shortName.endsWith('선') && shortName.length > 1) {
-			pushMapValue(routeIdsByShortName, shortName.slice(0, -1), row.route_id);
+		for (const key of routeShortNameKeys(shortName)) {
+			pushMapValue(routeIdsByShortName, key, row.route_id);
 		}
 	});
 
@@ -332,7 +318,7 @@ async function loadGtfsIndex(directory: string): Promise<GtfsIndex> {
 		calendarByServiceId.set(row.service_id, {
 			startDate: row.start_date ?? '',
 			endDate: row.end_date ?? '',
-			days: CALENDAR_DAY_COLUMNS.map((column) => row[column] ?? '0')
+			days: GTFS_CALENDAR_DAY_COLUMNS.map((column) => row[column] ?? '0')
 		});
 	});
 
@@ -343,7 +329,8 @@ async function loadGtfsIndex(directory: string): Promise<GtfsIndex> {
 			if (
 				!row.service_id ||
 				!row.date ||
-				(row.exception_type !== EXCEPTION_ADDED && row.exception_type !== EXCEPTION_REMOVED)
+				(row.exception_type !== GTFS_EXCEPTION_ADDED &&
+					row.exception_type !== GTFS_EXCEPTION_REMOVED)
 			) {
 				return;
 			}
@@ -434,71 +421,11 @@ function collectActiveTrips(index: GtfsIndex, routeIds: string[], serviceDate: D
 
 function isServiceActive(index: GtfsIndex, serviceId: string, date: Date): boolean {
 	const ymd = toGtfsDate(date);
-	const exception = index.calendarDateExceptions.get(calendarDateKey(serviceId, ymd));
-
-	if (exception === EXCEPTION_REMOVED) {
-		return false;
-	}
-
-	if (exception === EXCEPTION_ADDED) {
-		return true;
-	}
-
-	const calendar = index.calendarByServiceId.get(serviceId);
-
-	if (!calendar) {
-		return false;
-	}
-
-	if (calendar.startDate && ymd < calendar.startDate) {
-		return false;
-	}
-
-	if (calendar.endDate && ymd > calendar.endDate) {
-		return false;
-	}
-
-	return calendar.days[date.getDay()] === '1';
-}
-
-function nextBoardAndAlight(
-	points: StopTimePoint[],
-	boardStops: Set<string>,
-	alightStops: Set<string>,
-	afterSeconds: number
-): { boardSeconds: number; alightSeconds: number } | null {
-	let best: { boardSeconds: number; alightSeconds: number } | null = null;
-
-	for (const board of points) {
-		if (!boardStops.has(board.stopId) || board.departureSeconds < afterSeconds) {
-			continue;
-		}
-
-		const alight = points.find(
-			(point) => alightStops.has(point.stopId) && point.sequence > board.sequence
-		);
-
-		if (!alight) {
-			continue;
-		}
-
-		if (!best || board.departureSeconds < best.boardSeconds) {
-			best = { boardSeconds: board.departureSeconds, alightSeconds: alight.arrivalSeconds };
-		}
-	}
-
-	return best;
-}
-
-function calendarDateKey(serviceId: string, date: string): string {
-	return `${serviceId}\0${date}`;
-}
-
-function toGtfsDate(date: Date): string {
-	const year = date.getFullYear();
-	const month = String(date.getMonth() + 1).padStart(2, '0');
-	const day = String(date.getDate()).padStart(2, '0');
-	return `${year}${month}${day}`;
+	return isCalendarServiceActive(
+		index.calendarDateExceptions.get(calendarDateKey(serviceId, ymd)),
+		index.calendarByServiceId.get(serviceId),
+		date
+	);
 }
 
 function secondsSinceServiceStart(at: Date, serviceDate: Date): number {

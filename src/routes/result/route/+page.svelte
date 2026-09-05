@@ -3,12 +3,18 @@
 	import { resolve } from '$app/paths';
 	import RouteTimeline from '$lib/components/RouteTimeline.svelte';
 	import { scheduleRouteCopy } from '$lib/constants/kakao';
-	import { STAND_UP_BOARD_LABEL, STAND_UP_WALK_LABEL } from '$lib/constants/recommendation';
+	import {
+		ROUTE_PAGE_TITLE,
+		STAND_UP_BOARD_LABEL,
+		STAND_UP_WALK_LABEL,
+		resultArrivalCopy
+	} from '$lib/constants/recommendation';
 	import { tripSession } from '$lib/stores/trip-session.svelte';
 	import { standUpStartsWithWalk } from '$lib/utils/route-label';
 	import { formatClock, fromIso } from '$lib/utils/time';
 
-	const route = $derived(tripSession.result?.recommended.route ?? null);
+	const displayed = $derived(tripSession.displayedRecommended());
+	const route = $derived(displayed?.route ?? null);
 	const standUpLabel = $derived(
 		route && standUpStartsWithWalk(route.sections) ? STAND_UP_WALK_LABEL : STAND_UP_BOARD_LABEL
 	);
@@ -22,20 +28,19 @@
 
 <header class="nav-row">
 	<a class="nav-link" href={resolve('/result')}>← 결과</a>
-	<h1 class="nav-title">경로 상세</h1>
+	<h1 class="nav-title">{ROUTE_PAGE_TITLE}</h1>
 	<span></span>
 </header>
 
-{#if route && tripSession.result}
+{#if displayed && route && tripSession.result}
 	<p class="large-title">
-		{formatClock(fromIso(tripSession.result.recommended.departureAt))}
+		{formatClock(fromIso(displayed.departureAt))}
 	</p>
 	<p class="status-copy">{standUpLabel}</p>
 	<p class="status-copy">
-		{formatClock(fromIso(tripSession.result.recommended.expectedArrivalAt))} 도착 · {scheduleRouteCopy(
-			tripSession.result.scheduleSource
-		)}
+		{resultArrivalCopy(null, formatClock(fromIso(displayed.expectedArrivalAt)))}
 	</p>
+	<p class="status-copy">{scheduleRouteCopy(tripSession.result.scheduleSource)}</p>
 	<div class="card body">
 		<RouteTimeline sections={route.sections} totalTimeSeconds={route.totalTimeSeconds} />
 	</div>

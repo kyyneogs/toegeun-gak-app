@@ -1,10 +1,20 @@
 import { ERROR_CODES } from '$lib/constants/errors';
+import { ARRIVE_BY_MISSED_COPY } from '$lib/constants/recommendation';
 import { AppError, isAppError } from '$lib/domain/errors';
-import { selectEarliestArrival } from '$lib/domain/optimization/select-best-route';
+import {
+	alternativesFor,
+	filterArrivingBy,
+	latestArrivalAt,
+	selectLatestDeparture,
+	selectRouteByCriterion,
+	type RecommendationMode,
+	type RouteCriterion
+} from '$lib/domain/recommendation/criteria';
+import { toRecommendedRoute } from '$lib/domain/recommendation/map-route';
 import type {
 	RecommendationInput,
 	RecommendationResult,
-	RecommendedRoute
+	RouteAlternative
 } from '$lib/domain/recommendation/types';
 import type { TransitRoute } from '$lib/domain/route/route';
 import type { RecommendationService } from '$lib/ports/recommendation-service';
@@ -18,16 +28,40 @@ export class RecommendationApplicationService implements RecommendationService {
 	async recommend(input: RecommendationInput): Promise<RecommendationResult> {
 		const departureAfter = fromIso(input.trip.departureFrom);
 		const routes = await this.loadTimedRoutes(input, departureAfter);
-		const winner = selectEarliestArrival(routes);
+		const desiredArrivalAt = input.trip.desiredArrivalAt
+			? fromIso(input.trip.desiredArrivalAt)
+			: null;
+		const candidates = desiredArrivalAt ? filterArrivingBy(routes, desiredArrivalAt) : routes;
+
+		if (candidates.length === 0) {
+			throw new AppError(
+				ERROR_CODES.RECOMMENDATION_UNAVAILABLE,
+				desiredArrivalAt ? ARRIVE_BY_MISSED_COPY : undefined
+			);
+		}
+
+		const mode = desiredArrivalAt ? 'arriveBy' : 'leaveAfter';
+		const criterion = resolveCriterion(input.criterion, mode);
+		const winner =
+			criterion === 'latestDeparture'
+				? selectLatestDeparture(candidates)
+				: selectRouteByCriterion(candidates, criterion);
 
 		if (!winner) {
 			throw new AppError(ERROR_CODES.ROUTE_NOT_FOUND);
 		}
 
+		const alternativeRoutes = alternativesFor(candidates).map((item) => item.route);
+		await this.routeProvider.attachHeadwayLoss?.(uniqueRoutes([winner, ...alternativeRoutes]));
+
 		return {
 			id: createId('rec'),
 			tripId: input.trip.id,
-			recommended: toRecommended(winner),
+			recommended: toRecommendedRoute(winner),
+			criterion,
+			mode,
+			alternatives: toAlternatives(candidates),
+			naiveArrivalAt: latestArrivalAt(candidates) ?? winner.arrivalAt,
 			calculatedAt: toIso(new Date()),
 			scheduleSource: winner.scheduleSource
 		};
@@ -52,18 +86,38 @@ export class RecommendationApplicationService implements RecommendationService {
 	}
 }
 
-function toRecommended(route: TransitRoute): RecommendedRoute {
-	return {
-		departureAt: route.departureAt,
-		expectedArrivalAt: route.arrivalAt,
-		totalTimeSeconds: route.totalTimeSeconds,
-		waitingTimeSeconds: route.waitingTimeSeconds,
-		walkingTimeSeconds: route.walkingTimeSeconds,
-		transferCount: route.transferCount,
-		route,
-		chosenTrips: route.chosenTrips ?? [],
-		headwayLoss: route.headwayLoss ?? null
-	};
+function resolveCriterion(
+	requested: RouteCriterion | undefined,
+	mode: RecommendationMode
+): RouteCriterion | 'latestDeparture' {
+	if (requested) {
+		return requested;
+	}
+
+	return mode === 'arriveBy' ? 'latestDeparture' : 'earliestArrival';
+}
+
+function toAlternatives(routes: TransitRoute[]): RouteAlternative[] {
+	return alternativesFor(routes).map((item) => ({
+		criterion: item.criterion,
+		route: toRecommendedRoute(item.route)
+	}));
+}
+
+function uniqueRoutes(routes: TransitRoute[]): TransitRoute[] {
+	const seen = new Set<string>();
+	const unique: TransitRoute[] = [];
+
+	for (const route of routes) {
+		if (seen.has(route.routeId)) {
+			continue;
+		}
+
+		seen.add(route.routeId);
+		unique.push(route);
+	}
+
+	return unique;
 }
 
 function tripPoints(input: RecommendationInput) {

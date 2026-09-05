@@ -58,7 +58,11 @@ function makeResult(routeIds: string[]): RecommendationResult {
 			headwayLoss: null
 		},
 		calculatedAt: toIso(departure),
-		scheduleSource: 'gtfs'
+		scheduleSource: 'gtfs',
+		criterion: 'earliestArrival',
+		mode: 'leaveAfter',
+		alternatives: [],
+		naiveArrivalAt: toIso(arrival)
 	};
 }
 
@@ -69,9 +73,9 @@ describe('RuleBasedExplanationService', () => {
 			{ originName: '판교로 333', destinationName: '여수동 548' } satisfies ExplanationContext
 		);
 
-		expect(explanation.summary).toContain('330으로');
+		expect(explanation.summary).toContain('330 타고');
 		expect(explanation.summary).toContain('타면');
-		expect(explanation.details[0]).toContain('330으로');
+		expect(explanation.details[0]).toContain('330 타고');
 	});
 
 	it('mentions walking time when the recommended route includes a walk', async () => {
@@ -95,7 +99,7 @@ describe('RuleBasedExplanationService', () => {
 			destinationName: '여수동 548'
 		});
 
-		expect(explanation.summary).toContain('일어나 걸으면');
+		expect(explanation.summary).toContain('일어나면');
 		expect(explanation.details.some((detail) => detail.includes('8분'))).toBe(true);
 	});
 });

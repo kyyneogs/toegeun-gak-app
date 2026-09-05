@@ -76,6 +76,9 @@ describe('RecommendationApplicationService', () => {
 
 		expect(formatClock(new Date(result.recommended.expectedArrivalAt))).toBe('18:40');
 		expect(result.recommended.route.routeId).toBe('route_18:40');
+		expect(result.criterion).toBe('earliestArrival');
+		expect(formatClock(new Date(result.naiveArrivalAt))).toBe('19:20');
+		expect(result.alternatives).toHaveLength(4);
 	});
 
 	it('keeps the first route when arrivals are equal', async () => {
@@ -112,5 +115,50 @@ describe('RecommendationApplicationService', () => {
 
 		expect(result.liveRoute).toBeUndefined();
 		expect(result.recommended.route.provider).toBe('scripted');
+	});
+
+	it('keeps only routes that arrive by the desired time and leaves as late as possible', async () => {
+		const earlyLeave = makeRoute('18:50', 50);
+		earlyLeave.routeId = 'early';
+		const laterLeave = makeRoute('18:55', 40);
+		laterLeave.routeId = 'later';
+		laterLeave.departureAt = toIso(combineLocalDateAndClock('18:20', DAY));
+		const tooLate = makeRoute('19:40', 80);
+		tooLate.routeId = 'miss';
+
+		const tripService = new TripApplicationService();
+		const trip = await tripService.createTrip({
+			origin: COMPANY_PLACE,
+			destination: GANGNAM_STATION,
+			departureFrom: combineLocalDateAndClock('18:00', DAY),
+			desiredArrivalAt: combineLocalDateAndClock('19:00', DAY)
+		});
+		const result = await new RecommendationApplicationService(
+			new ScriptedRouteProvider([earlyLeave, laterLeave, tooLate])
+		).recommend({ trip });
+
+		expect(result.mode).toBe('arriveBy');
+		expect(result.criterion).toBe('latestDeparture');
+		expect(result.recommended.route.routeId).toBe('later');
+	});
+
+	it('throws when no route arrives by the desired time', async () => {
+		const tripService = new TripApplicationService();
+		const trip = await tripService.createTrip({
+			origin: COMPANY_PLACE,
+			destination: GANGNAM_STATION,
+			departureFrom: combineLocalDateAndClock('18:00', DAY),
+			desiredArrivalAt: combineLocalDateAndClock('18:30', DAY)
+		});
+
+		try {
+			await new RecommendationApplicationService(
+				new ScriptedRouteProvider([makeRoute('19:20', 80)])
+			).recommend({ trip });
+			expect.fail('should throw');
+		} catch (error) {
+			expect(error).toBeInstanceOf(AppError);
+			expect((error as AppError).code).toBe(ERROR_CODES.RECOMMENDATION_UNAVAILABLE);
+		}
 	});
 });

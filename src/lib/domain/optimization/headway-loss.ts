@@ -1,9 +1,20 @@
-import { HEADWAY_ALT_COST_KRW, HEADWAY_MISS_SECONDS } from '$lib/constants/recommendation';
+import {
+	HEADWAY_ALT_COST_KRW,
+	HEADWAY_DELAY_SUPPORT,
+	HEADWAY_LAST_TRAIN_SUPPORT,
+	HEADWAY_MISS_SECONDS
+} from '$lib/constants/recommendation';
 import { topologyFromChosenRoute } from '$lib/domain/optimization/topology-from-chosen';
 import { recalculateRoute } from '$lib/domain/optimization/recalculate-route';
 import type { HeadwayLoss, TransitRoute } from '$lib/domain/route/route';
 import type { TimetablePort } from '$lib/ports/timetable-port';
 import { addSeconds, formatDurationMinutes, fromIso, secondsBetween } from '$lib/utils/time';
+
+export interface HeadwayLossDisplay {
+	targetValue: number;
+	support: string;
+	tone: 'delay' | 'danger';
+}
 
 export async function measureHeadwayLoss(
 	route: TransitRoute,
@@ -39,10 +50,34 @@ export async function measureHeadwayLoss(
 
 export function headwayLossCopy(loss: HeadwayLoss): string {
 	if (loss.kind === 'lastTrip') {
-		return `막차를 놓쳐 예상 약 ${formatWon(loss.estimatedCostKrw)}의 추가 비용이 들었을 거예요.`;
+		return `막차를 놓칠 수 있어요. 택시는 약 ${formatWon(loss.estimatedCostKrw)} 예상이에요.`;
 	}
 
-	return `1분만 늦어도 ${formatDurationMinutes(loss.delaySeconds)} 늦게 도착했을 거예요.`;
+	return `집에 ${formatDurationMinutes(loss.delaySeconds)} 늦게 도착해요.`;
+}
+
+export function headwayLossDisplay(loss: HeadwayLoss): HeadwayLossDisplay {
+	if (loss.kind === 'lastTrip') {
+		return {
+			targetValue: loss.estimatedCostKrw,
+			support: HEADWAY_LAST_TRAIN_SUPPORT,
+			tone: 'danger'
+		};
+	}
+
+	return {
+		targetValue: Math.round(loss.delaySeconds / 60),
+		support: HEADWAY_DELAY_SUPPORT,
+		tone: 'delay'
+	};
+}
+
+export function formatHeadwayLossFigure(loss: HeadwayLoss, value: number): string {
+	if (loss.kind === 'lastTrip') {
+		return `약 ${formatWon(value)}`;
+	}
+
+	return `+${value}분`;
 }
 
 function formatWon(amount: number): string {

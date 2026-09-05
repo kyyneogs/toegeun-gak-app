@@ -5,4 +5,5 @@ export interface RouteProvider {
 	findLiveRoute?(
 		request: Pick<RouteRequest, 'origin' | 'destination'>
 	): Promise<TransitRoute | null>;
+	attachHeadwayLoss?(routes: TransitRoute[]): Promise<void>;
 }

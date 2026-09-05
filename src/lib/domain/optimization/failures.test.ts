@@ -15,6 +15,7 @@ describe('formatRouteFailures', () => {
 		]);
 
 		expect(message).toContain(ERROR_USER_MESSAGES.ROUTE_NOT_FOUND);
+		expect(message).toContain('다음 차가 없어요');
 		expect(message).toContain('경로 1');
 		expect(message).toContain('판교역');
 		expect(message).toContain('5001, 5002');

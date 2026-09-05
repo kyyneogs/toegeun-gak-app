@@ -1,6 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { getAppServices } from '$lib/application/composition';
+	import {
+		CONNECTION_CHECK_AGAIN,
+		CONNECTION_CHECKING_COPY,
+		CONNECTION_CHECKING_LABEL,
+		CONNECTION_FAILED_COPY
+	} from '$lib/constants/recommendation';
 	import type { PlaceConnectionResult } from '$lib/ports/place-connection';
 
 	interface Props {
@@ -26,7 +32,7 @@
 			result = {
 				backend: 'kakao',
 				ok: false,
-				message: '연결 상태를 확인하지 못했습니다.'
+				message: CONNECTION_FAILED_COPY
 			};
 		} finally {
 			status = 'idle';
@@ -44,7 +50,7 @@
 	);
 	const label = $derived(
 		status === 'checking'
-			? '확인 중'
+			? CONNECTION_CHECKING_LABEL
 			: result?.backend === 'mock'
 				? 'Mock'
 				: result?.ok
@@ -61,14 +67,14 @@
 	{#if !compact || (result && !result.ok)}
 		<p class="helper">
 			{#if status === 'checking' && !compact}
-				연결을 확인하는 중입니다.
+				{CONNECTION_CHECKING_COPY}
 			{:else if result}
 				{result.message}
 				{#if result.samplePlaceName}
 					· {result.samplePlaceName}
 				{/if}
 				{#if !result.ok && currentOrigin}
-					현재 주소는 {currentOrigin} 입니다.
+					지금 주소는 {currentOrigin}이에요.
 				{/if}
 			{/if}
 		</p>
@@ -80,7 +86,7 @@
 			disabled={status === 'checking'}
 			onclick={() => runCheck()}
 		>
-			다시 확인
+			{CONNECTION_CHECK_AGAIN}
 		</button>
 	{/if}
 </div>

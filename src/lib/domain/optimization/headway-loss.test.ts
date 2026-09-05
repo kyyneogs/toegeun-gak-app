@@ -1,5 +1,10 @@
 import { HEADWAY_ALT_COST_KRW } from '$lib/constants/recommendation';
-import { headwayLossCopy, measureHeadwayLoss } from '$lib/domain/optimization/headway-loss';
+import {
+	formatHeadwayLossFigure,
+	headwayLossCopy,
+	headwayLossDisplay,
+	measureHeadwayLoss
+} from '$lib/domain/optimization/headway-loss';
 import type { TransitRoute } from '$lib/domain/route/route';
 import type { NextTripQuery, TimetablePort } from '$lib/ports/timetable-port';
 import { combineLocalDateAndClock, toIso } from '$lib/utils/time';
@@ -125,7 +130,7 @@ describe('measureHeadwayLoss', () => {
 
 		expect(loss).toEqual({ kind: 'arrivalDelay', delaySeconds: 30 * 60 });
 		expect(new Set(timetable.queriedRouteIds)).toEqual(new Set(['5002', '2']));
-		expect(headwayLossCopy(loss!)).toBe('1분만 늦어도 30분 늦게 도착했을 거예요.');
+		expect(headwayLossCopy(loss!)).toBe('집에 30분 늦게 도착해요.');
 	});
 
 	it('uses estimated alternative cost when missing the trip cascades to no later service', async () => {
@@ -180,8 +185,36 @@ describe('measureHeadwayLoss', () => {
 			routeId: '5002',
 			estimatedCostKrw: HEADWAY_ALT_COST_KRW
 		});
-		expect(headwayLossCopy(loss!)).toBe(
-			'막차를 놓쳐 예상 약 15,000원의 추가 비용이 들었을 거예요.'
+		expect(headwayLossCopy(loss!)).toBe('막차를 놓칠 수 있어요. 택시는 약 15,000원 예상이에요.');
+	});
+});
+
+describe('headwayLossDisplay', () => {
+	it('splits delay into a plus-minutes figure and support line', () => {
+		const display = headwayLossDisplay({ kind: 'arrivalDelay', delaySeconds: 30 * 60 });
+
+		expect(display).toEqual({
+			targetValue: 30,
+			support: '집에 늦게 도착해요.',
+			tone: 'delay'
+		});
+		expect(formatHeadwayLossFigure({ kind: 'arrivalDelay', delaySeconds: 30 * 60 }, 30)).toBe(
+			'+30분'
 		);
+	});
+
+	it('splits last-train cost into a won figure and support line', () => {
+		const loss = {
+			kind: 'lastTrip' as const,
+			routeId: '5002',
+			estimatedCostKrw: HEADWAY_ALT_COST_KRW
+		};
+
+		expect(headwayLossDisplay(loss)).toEqual({
+			targetValue: HEADWAY_ALT_COST_KRW,
+			support: '막차를 놓칠 수 있어요. 택시는 예상이에요.',
+			tone: 'danger'
+		});
+		expect(formatHeadwayLossFigure(loss, HEADWAY_ALT_COST_KRW)).toBe('약 15,000원');
 	});
 });

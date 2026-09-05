@@ -49,6 +49,7 @@ Thumbs.db
 *.swp
 .idea/
 
-# Unzipped GTFS feed (hundreds of MB). Keep only fixtures under src/.
+# Local database (PGlite) for accounts, commits, ranking, and push
+.data/
 /data/gtfs/
 /data/**/*.zip

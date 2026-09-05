@@ -8,6 +8,24 @@ export function extractRouteShortName(routeName: string): string {
 		.replace(/\s+/g, '');
 }
 
+const BUS_LETTER_VARIANT = /^(\d+)[A-Za-z]$/;
+
+export function routeShortNameKeys(shortName: string): string[] {
+	const keys = [shortName];
+
+	if (shortName.endsWith('선') && shortName.length > 1) {
+		keys.push(shortName.slice(0, -1));
+	}
+
+	const busVariant = BUS_LETTER_VARIANT.exec(shortName);
+
+	if (busVariant?.[1]) {
+		keys.push(busVariant[1]);
+	}
+
+	return [...new Set(keys)];
+}
+
 export function normalizeStopName(stopName: string): string {
 	return stopName
 		.replace(/\([^)]*\)/g, '')

@@ -1,7 +1,10 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadGtfsSliceFromDirectory } from '$lib/adapters/gtfs/load-gtfs-slice';
+import { SqlGtfsTimetable } from '$lib/adapters/gtfs/sql-gtfs-timetable';
 import { EmptyTimetable, GtfsTimetable } from '$lib/adapters/gtfs/gtfs-timetable';
 import { KakaoScheduledRouteProvider } from '$lib/adapters/kakao/kakao-scheduled-route-provider';
+import { resetDatabaseForTests } from '$lib/server/db';
 import type { KakaoTransitClient } from '$lib/adapters/kakao/kakao-transit-client';
 import type { KakaoTransitResponse } from '$lib/adapters/kakao/kakao-transit-document';
 import { ERROR_CODES } from '$lib/constants/errors';
@@ -9,7 +12,7 @@ import { HEADWAY_ALT_COST_KRW } from '$lib/constants/recommendation';
 import { AppError } from '$lib/domain/errors';
 import type { NextTripQuery, TimetablePort } from '$lib/ports/timetable-port';
 import { combineLocalDateAndClock, formatClock } from '$lib/utils/time';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 const DAY = new Date(2026, 7, 29);
 const POINTS = {
@@ -178,7 +181,7 @@ describe('KakaoScheduledRouteProvider', () => {
 		});
 
 		expect(routes[0]?.sections[0]?.type).toBe('walk');
-		expect(routes[0]?.walkingTimeSeconds).toBeGreaterThan(0);
+		expect(routes[0]?.walkingTimeSeconds).toBeGreaterThanOrEqual(60);
 	});
 
 	it('throws with failure points when every topology has no trip', async () => {
@@ -198,4 +201,29 @@ describe('KakaoScheduledRouteProvider', () => {
 			expect((error as AppError).message).toContain('경로 2');
 		}
 	});
+
+	it('reproduces bus board and alight times from the SQL timetable', async () => {
+		await resetDatabaseForTests();
+		await loadGtfsSliceFromDirectory(GTFS_FIXTURE_DIR);
+		const client = stubClient();
+		const provider = new KakaoScheduledRouteProvider(client, new SqlGtfsTimetable());
+
+		const routes = await provider.findRoutes({
+			...POINTS,
+			departureAt: combineLocalDateAndClock('18:00', DAY)
+		});
+		const busRoute = routes.find((route) =>
+			route.sections.some((section) => section.type === 'bus')
+		);
+		const bus = busRoute?.sections.find((section) => section.type === 'bus');
+
+		expect(busRoute?.scheduleSource).toBe('gtfs');
+		expect(formatClock(new Date(bus!.departureAt))).toBe('18:15');
+		expect(formatClock(new Date(bus!.arrivalAt))).toBe('18:40');
+		expect(bus?.routeId).toBe('5002');
+	});
+});
+
+afterEach(async () => {
+	await resetDatabaseForTests();
 });

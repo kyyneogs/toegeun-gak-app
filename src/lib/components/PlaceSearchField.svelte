@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { PLACE_SEARCH_DEBOUNCE_MS } from '$lib/constants/recommendation';
+	import { PLACE_SEARCH_DEBOUNCE_MS, SEARCHING_COPY } from '$lib/constants/recommendation';
 	import type { Place } from '$lib/domain/place/place';
 	import { getAppServices } from '$lib/application/composition';
 
@@ -74,7 +74,7 @@
 	}
 </script>
 
-<div class="search">
+<div class="search" class:open>
 	<input
 		class="text-input"
 		type="search"
@@ -89,7 +89,7 @@
 		}}
 	/>
 	{#if searching}
-		<p class="helper">검색 중...</p>
+		<p class="helper">{SEARCHING_COPY}</p>
 	{/if}
 	{#if open}
 		<ul class="results">
@@ -108,11 +108,16 @@
 <style>
 	.search {
 		position: relative;
+		z-index: 1;
+	}
+
+	.search.open {
+		z-index: 12;
 	}
 
 	.results {
 		position: absolute;
-		z-index: 5;
+		z-index: 13;
 		left: 0;
 		right: 0;
 		top: calc(100% + 8px);

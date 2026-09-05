@@ -1,4 +1,8 @@
-import { EARTH_RADIUS_METERS, WALKING_SPEED_METERS_PER_SECOND } from '$lib/constants/walk';
+import {
+	EARTH_RADIUS_METERS,
+	WALKING_SPEED_METERS_PER_SECOND,
+	walkDurationSeconds
+} from '$lib/constants/walk';
 
 export const COORDINATE_CACHE_PRECISION = 5;
 
@@ -35,7 +39,7 @@ export function closestPoint(origin: GeoPoint, candidates: readonly GeoPoint[]):
 }
 
 export function walkingSecondsBetween(from: GeoPoint, to: GeoPoint): number {
-	return Math.round(distanceMeters(from, to) / WALKING_SPEED_METERS_PER_SECOND);
+	return walkDurationSeconds(distanceMeters(from, to) / WALKING_SPEED_METERS_PER_SECOND);
 }
 
 function toRadians(degrees: number): number {

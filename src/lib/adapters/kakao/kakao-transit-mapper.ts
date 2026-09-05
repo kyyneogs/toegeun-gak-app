@@ -5,6 +5,7 @@ import type {
 } from '$lib/adapters/kakao/kakao-transit-document';
 import type { TopologyRoute } from '$lib/domain/optimization/types';
 import type { RouteLegTemplate, RouteTemplate } from '$lib/domain/route/template';
+import { walkDurationSeconds } from '$lib/constants/walk';
 
 const STEP_TYPE: Record<string, RouteLegTemplate['type']> = {
 	WALKING: 'walk',
@@ -130,9 +131,9 @@ function mapKakaoTopologyStep(
 	const places = placeNames(step, index, stepCount, originName, destinationName);
 
 	if (type === 'walk') {
-		const duration = properties?.time;
+		const duration = walkDurationSeconds(properties?.time ?? 0);
 
-		if (!duration || duration <= 0) {
+		if (duration <= 0) {
 			return 'skip';
 		}
 
@@ -192,7 +193,8 @@ function mapKakaoLiveStep(
 ): RouteLegTemplate | null {
 	const properties = step.properties;
 	const type = properties?.type ? STEP_TYPE[properties.type] : undefined;
-	const durationSeconds = properties?.time;
+	const durationSeconds =
+		type === 'walk' ? walkDurationSeconds(properties?.time ?? 0) : properties?.time;
 
 	if (!type || !durationSeconds || durationSeconds <= 0) {
 		return null;

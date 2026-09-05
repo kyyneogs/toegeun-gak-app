@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { TIMELINE_TOTAL_SUFFIX } from '$lib/constants/recommendation';
 	import type { RouteSection } from '$lib/domain/route/route';
 	import { formatClock, formatDurationMinutes, fromIso, secondsBetween } from '$lib/utils/time';
 
@@ -41,7 +42,7 @@
 		</li>
 	{/each}
 </ol>
-<p class="total">총 {formatDurationMinutes(totalTimeSeconds)}</p>
+<p class="total">모두 {formatDurationMinutes(totalTimeSeconds)}{TIMELINE_TOTAL_SUFFIX}</p>
 
 <style>
 	.timeline {
