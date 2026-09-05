@@ -29,7 +29,7 @@ cp .env.example .env
 npm run dev
 ```
 
-카카오 콘솔의 JavaScript SDK 도메인에 개발 주소와 배포 주소를 등록하세요. `http://` 또는 `https://`를 포함한 호스트:포트가 필요합니다. 예: `http://localhost:5173`, `https://your-app.vercel.app`. 와일드카드가 안 되면 미리보기 URL을 각각 넣습니다.
+카카오 콘솔의 JavaScript SDK 도메인에 개발 주소와 배포 주소를 등록하세요. `http://` 또는 `https://`를 포함한 호스트:포트가 필요합니다. 예: `http://localhost:5173`. Vercel 프로젝트 `toegeun-gak-app`(팀 noname-8398)은 `https://toegeun-gak-app.vercel.app`과 미리보기 호스트(`https://toegeun-gak-app-git-cursor-gtfs-csv-schema-s-a9b2cd-noname-8398.vercel.app` 등)를 각각 넣습니다. 와일드카드가 안 되면 URL을 각각 넣습니다.
 
 ## 환경 변수
 
@@ -49,7 +49,7 @@ npm run dev
 ## 1차 배포 (Vercel + Supabase)
 
 1. Supabase SQL 에디터에 [`sql/schema.sql`](sql/schema.sql)을 **배포 전에** 적용합니다. 앱은 Vercel에서 `CREATE IF NOT EXISTS`를 돌리지 않습니다.
-2. Vercel 프로젝트 루트는 `dev/`입니다. 함수 런타임은 Node 22(`svelte.config.js`, `package.json` `engines`)입니다. Env에 `DATABASE_URL`(트랜잭션 풀러 `:6543`), `KAKAO_REST_API_KEY`, `PUBLIC_KAKAO_JS_KEY`, `VAPID_*`, `CRON_SECRET`을 넣습니다. `GTFS_DIR`은 넣지 않습니다.
+2. GitHub 저장소 루트가 이미 앱입니다. Vercel **Root Directory는 비웁니다.** (로컬 폴더 이름이 `dev/`여도 원격에는 `dev/dev`가 없습니다.) Env에 `DATABASE_URL`(트랜잭션 풀러 `:6543`), `KAKAO_REST_API_KEY`, `PUBLIC_KAKAO_JS_KEY`, `VAPID_*`, `CRON_SECRET`을 넣습니다. `GTFS_DIR`은 넣지 않습니다. 함수 런타임은 Node 22입니다.
 3. 로컬에서 피드를 푼 뒤 **서울·성남 슬라이스**만 DB에 올립니다. 전체 `stop_times`를 넣지 마세요.
 
 ```sh
