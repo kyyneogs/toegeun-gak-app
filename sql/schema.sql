@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS gtfs_stop_times (
 	PRIMARY KEY (trip_id, stop_sequence)
 );
 
--- PK (trip_id, stop_sequence)와 동일한 보조 인덱스는 만들지 않습니다.
+CREATE INDEX IF NOT EXISTS gtfs_stop_times_stop_id_idx ON gtfs_stop_times (stop_id);
 
 ALTER TABLE gtfs_routes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE gtfs_stops ENABLE ROW LEVEL SECURITY;

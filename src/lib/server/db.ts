@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import postgres from 'postgres';
+import { env } from '$env/dynamic/private';
 import { APP_SCHEMA_SQL } from '$lib/server/schema';
 
 type QueryRow = Record<string, unknown>;
@@ -42,6 +43,22 @@ export async function resetDatabaseForTests(): Promise<void> {
 	await query('DELETE FROM gtfs_routes');
 }
 
+export function remotePostgresUrl(): string | undefined {
+	const inTest = process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
+
+	if (inTest) {
+		return undefined;
+	}
+
+	// Vite는 .env의 비-PUBLIC 값을 process.env에 넣지 않습니다. SvelteKit $env를 씁니다.
+	const databaseUrl = env.DATABASE_URL?.trim() || process.env.DATABASE_URL?.trim();
+	return databaseUrl && databaseUrl.length > 0 ? databaseUrl : undefined;
+}
+
+export function isRemotePostgresConfigured(): boolean {
+	return Boolean(remotePostgresUrl());
+}
+
 export function isUniqueViolation(cause: unknown): boolean {
 	if (!cause || typeof cause !== 'object') {
 		return false;
@@ -73,8 +90,7 @@ async function getClient(): Promise<DatabaseClient> {
 }
 
 async function createClient(): Promise<DatabaseClient> {
-	const inTest = process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
-	const databaseUrl = inTest ? undefined : process.env.DATABASE_URL?.trim();
+	const databaseUrl = remotePostgresUrl();
 
 	if (process.env.VERCEL && !databaseUrl) {
 		throw new Error('DATABASE_URL is required on Vercel');
@@ -82,6 +98,7 @@ async function createClient(): Promise<DatabaseClient> {
 
 	if (databaseUrl) {
 		const sql = postgres(databaseUrl, { max: 4, prepare: false, ssl: 'require' });
+		console.info('Database: remote Postgres', { host: postgresHost(databaseUrl) });
 		const client: DatabaseClient = {
 			async query<T extends QueryRow>(text: string, params: unknown[] = []): Promise<T[]> {
 				const rows = await sql.unsafe(text, params as never[]);
@@ -121,9 +138,19 @@ async function createClient(): Promise<DatabaseClient> {
 			await pglite.exec(sqlText);
 		}
 	};
+	console.info('Database: local PGlite');
 	await dropLegacyGtfsTablesIfNeeded(client);
 	await applySchema(client);
 	return client;
+}
+
+function postgresHost(databaseUrl: string): string {
+	try {
+		return new URL(databaseUrl.replace(/^postgres(ql)?:/u, 'https:')).host;
+	} catch (cause) {
+		console.error('DATABASE_URL host parse failed', cause);
+		return '(unparsed)';
+	}
 }
 
 async function dropLegacyGtfsTablesIfNeeded(client: DatabaseClient): Promise<void> {

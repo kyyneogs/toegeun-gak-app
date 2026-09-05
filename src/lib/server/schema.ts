@@ -124,4 +124,6 @@ CREATE TABLE IF NOT EXISTS gtfs_stop_times (
 	stop_sequence INTEGER NOT NULL,
 	PRIMARY KEY (trip_id, stop_sequence)
 );
+
+CREATE INDEX IF NOT EXISTS gtfs_stop_times_stop_id_idx ON gtfs_stop_times (stop_id);
 `.trim();

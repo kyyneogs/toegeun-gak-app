@@ -11,7 +11,7 @@
 - 계정·기록: Postgres (`DATABASE_URL`). 로컬만 키가 없으면 PGlite
 - 장소 검색: Kakao Maps JavaScript SDK
 - 경로: Kakao REST `publictraffic` (서버 전용 키)
-- 시각표: Supabase `gtfs_*` 서울·성남 슬라이스. 로컬 개발은 `GTFS_DIR` CSV도 가능
+- 시각표: `DATABASE_URL`이 있으면 Supabase `gtfs_*`만 씁니다. 키가 없을 때만 로컬 `GTFS_DIR` CSV / PGlite
 - 알림: 웹 푸시(VAPID). 로컬 Node는 `setInterval`, Vercel은 Cron
 
 API 키는 저장소에 넣지 않습니다. REST 키는 브라우저에 노출하지 않습니다. 브라우저는 GTFS를 받지 않습니다.
@@ -73,7 +73,7 @@ zip·원본 피드는 git과 Vercel 함수 디스크에 올리지 마세요.
 
 `data/raw/`의 작은 CSV는 참고용입니다. 파일 시각표는 `GTFS_DIR`의 `routes.txt`, `stops.txt`, `trips.txt`, `stop_times.txt`, `calendar.txt`입니다.
 
-서버가 고르는 순서: `DATABASE_URL`이 있고 `gtfs_routes`에 행이 있으면 SQL → 아니면 로컬 `GTFS_DIR` → 둘 다 없으면 빈 시각표/Mock.
+서버가 고르는 순서: `DATABASE_URL`이 있으면 SQL만 씁니다(슬라이스가 비면 로컬 CSV로 넘어가지 않습니다). 키가 없을 때만 `GTFS_DIR` CSV → 없으면 빈 시각표/Mock.
 
 ## 스크립트
 
