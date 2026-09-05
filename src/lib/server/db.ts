@@ -97,9 +97,15 @@ async function createClient(): Promise<DatabaseClient> {
 	}
 
 	if (databaseUrl) {
-		const sql = postgres(databaseUrl, { max: 4, prepare: false, ssl: 'require' });
+		const sql = postgres(databaseUrl, {
+			max: 4,
+			prepare: false,
+			ssl: 'require',
+			connect_timeout: 8
+		});
 		console.info('Database: remote Postgres', { host: postgresHost(databaseUrl) });
-		const client: DatabaseClient = {
+		// 원격 DB 스키마는 sql/schema.sql 로 적용합니다. 풀러에 CREATE INDEX를 매 기동마다 돌리지 않습니다.
+		return {
 			async query<T extends QueryRow>(text: string, params: unknown[] = []): Promise<T[]> {
 				const rows = await sql.unsafe(text, params as never[]);
 				return [...rows] as unknown as T[];
@@ -108,13 +114,6 @@ async function createClient(): Promise<DatabaseClient> {
 				await sql.unsafe(sqlText);
 			}
 		};
-
-		if (!process.env.VERCEL) {
-			await dropLegacyGtfsTablesIfNeeded(client);
-			await applySchema(client);
-		}
-
-		return client;
 	}
 
 	if (import.meta.env.PROD) {

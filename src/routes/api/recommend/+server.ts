@@ -10,6 +10,7 @@ export const config = {
 };
 
 export async function POST({ request }) {
+	console.info('Recommend request started');
 	let body: unknown;
 
 	try {
