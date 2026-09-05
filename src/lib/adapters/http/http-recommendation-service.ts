@@ -62,6 +62,12 @@ export class HttpRecommendationService implements RecommendationService {
 }
 
 async function readPayload(response: Response): Promise<RecommendApiResponse> {
+	const contentType = response.headers.get('content-type') ?? '';
+
+	if (!contentType.includes('application/json')) {
+		throw new AppError(ERROR_CODES.ROUTE_PROVIDER_TIMEOUT);
+	}
+
 	try {
 		return (await response.json()) as RecommendApiResponse;
 	} catch (cause) {

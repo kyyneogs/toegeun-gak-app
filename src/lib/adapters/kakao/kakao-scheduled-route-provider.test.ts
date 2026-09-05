@@ -184,6 +184,26 @@ describe('KakaoScheduledRouteProvider', () => {
 		expect(routes[0]?.walkingTimeSeconds).toBeGreaterThanOrEqual(60);
 	});
 
+	it('uses Kakao live times on Vercel instead of GTFS', async () => {
+		process.env.VERCEL = '1';
+		const client = stubClient();
+		const timetable = new RecordingTimetable(new GtfsTimetable(GTFS_FIXTURE_DIR));
+		const provider = new KakaoScheduledRouteProvider(client, timetable);
+
+		try {
+			const routes = await provider.findRoutes({
+				...POINTS,
+				departureAt: combineLocalDateAndClock('18:00', DAY)
+			});
+
+			expect(routes).toHaveLength(1);
+			expect(routes[0]?.provider).toBe('kakao');
+			expect(timetable.queriedRouteIds).toEqual([]);
+		} finally {
+			delete process.env.VERCEL;
+		}
+	});
+
 	it('throws with failure points when every topology has no trip', async () => {
 		const client = stubClient();
 		const provider = new KakaoScheduledRouteProvider(client, new EmptyTimetable());

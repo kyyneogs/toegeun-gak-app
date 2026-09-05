@@ -82,4 +82,25 @@ describe('HttpRecommendationService', () => {
 			expect((error as AppError).code).toBe(ERROR_CODES.RECOMMENDATION_UNAVAILABLE);
 		}
 	});
+
+	it('maps a non-JSON gateway timeout to ROUTE_PROVIDER_TIMEOUT', async () => {
+		const trip = await new TripApplicationService().createTrip({
+			origin: COMPANY_PLACE,
+			destination: GANGNAM_STATION,
+			departureFrom: combineLocalDateAndClock('18:00', DAY)
+		});
+		const fetchImpl: typeof fetch = async () =>
+			new Response('<html>timeout</html>', {
+				status: 504,
+				headers: { 'Content-Type': 'text/html' }
+			});
+
+		try {
+			await new HttpRecommendationService(fetchImpl).recommend({ trip });
+			expect.fail('should throw');
+		} catch (error) {
+			expect(error).toBeInstanceOf(AppError);
+			expect((error as AppError).code).toBe(ERROR_CODES.ROUTE_PROVIDER_TIMEOUT);
+		}
+	});
 });

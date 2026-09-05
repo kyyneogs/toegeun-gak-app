@@ -7,6 +7,10 @@ export const SEOUL_TIME_ZONE = 'Asia/Seoul';
 export const RECOMMEND_MAX_DURATION_SECONDS = 10;
 export const CRON_MAX_DURATION_SECONDS = 10;
 
+export function usesKakaoLiveSchedule(): boolean {
+	return Boolean(process.env.VERCEL);
+}
+
 export type StandupLeadMinutes = (typeof STANDUP_LEAD_MINUTE_OPTIONS)[number];
 
 export function isStandupLeadMinutes(value: unknown): value is StandupLeadMinutes {
