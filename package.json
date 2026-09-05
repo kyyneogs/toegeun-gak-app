@@ -23,6 +23,7 @@
 		"gtfs:filter-seoul-seongnam": "npx --yes vite-node src/lib/adapters/gtfs/filter-gtfs-seoul-seongnam.cli.ts"
 	},
 	"devDependencies": {
+		"@electric-sql/pglite": "^0.5.8",
 		"@eslint/js": "^10.0.1",
 		"@sveltejs/adapter-vercel": "^6.3.4",
 		"@sveltejs/kit": "^2.63.0",
@@ -44,7 +45,6 @@
 		"vitest": "^4.1.8"
 	},
 	"dependencies": {
-		"@electric-sql/pglite": "^0.5.8",
 		"postgres": "^3.4.9",
 		"web-push": "^3.6.7"
 	}

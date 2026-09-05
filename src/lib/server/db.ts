@@ -100,6 +100,10 @@ async function createClient(): Promise<DatabaseClient> {
 		return client;
 	}
 
+	if (import.meta.env.PROD) {
+		throw new Error('DATABASE_URL is required in production');
+	}
+
 	// Vercel 번들에 PGlite를 넣지 않습니다. 로컬·테스트만 동적 적재합니다.
 	const { PGlite } = await import('@electric-sql/pglite');
 	const dataDir =

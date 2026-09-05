@@ -260,8 +260,11 @@ function resolveGtfsDirectory(directory: string): string {
 		return fromCwd;
 	}
 
-	const fromDev = resolve(process.cwd(), 'dev', directory);
+	if (import.meta.env.PROD) {
+		return fromCwd;
+	}
 
+	const fromDev = resolve(process.cwd(), 'dev', directory);
 	if (hasRequiredGtfsFiles(fromDev)) {
 		return fromDev;
 	}

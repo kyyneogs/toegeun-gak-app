@@ -5,3 +5,11 @@ export function localGtfsDirectory(configured: string | undefined): string {
 	const trimmed = configured?.trim() ?? '';
 	return trimmed.length > 0 ? trimmed : GTFS_SEOUL_SEONGNAM_DIR;
 }
+
+export function serverGtfsDirectory(configured: string | undefined): string {
+	if (import.meta.env.PROD) {
+		return configured?.trim() ?? '';
+	}
+
+	return localGtfsDirectory(configured);
+}

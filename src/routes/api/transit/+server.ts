@@ -4,7 +4,7 @@ import { parseTransitRequest } from '$lib/adapters/http/transit-request';
 import { getServerKakaoRouteProvider } from '$lib/adapters/kakao/kakao-server';
 import { ERROR_CODES, ERROR_USER_MESSAGES } from '$lib/constants/errors';
 import { isKakaoRestKeyConfigured } from '$lib/constants/kakao';
-import { localGtfsDirectory } from '$lib/constants/gtfs-paths';
+import { serverGtfsDirectory } from '$lib/constants/gtfs-paths';
 import { isAppError } from '$lib/domain/errors';
 
 export async function POST({ request }) {
@@ -48,7 +48,7 @@ export async function POST({ request }) {
 	}
 
 	try {
-		const gtfsDir = localGtfsDirectory(env.GTFS_DIR);
+		const gtfsDir = serverGtfsDirectory(env.GTFS_DIR);
 		const provider = getServerKakaoRouteProvider(restKey, gtfsDir);
 		const liveRoute = await provider.findLiveRoute(routeRequest);
 		let routes;
