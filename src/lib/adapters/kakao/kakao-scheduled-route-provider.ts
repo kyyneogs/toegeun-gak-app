@@ -4,7 +4,6 @@ import {
 	mapKakaoRoutesToTopologies
 } from '$lib/adapters/kakao/kakao-transit-mapper';
 import { ERROR_CODES } from '$lib/constants/errors';
-import { usesKakaoLiveSchedule } from '$lib/constants/persist';
 import {
 	firstTransitSegment,
 	lastTransitSegment,
@@ -52,15 +51,6 @@ export class KakaoScheduledRouteProvider implements RouteProvider {
 
 		if (!cached || cached.topologies.length === 0) {
 			return [];
-		}
-
-		if (usesKakaoLiveSchedule()) {
-			if (cached.liveRoute) {
-				console.info('Recommend: Kakao live schedule (Vercel time budget)');
-				return [cached.liveRoute];
-			}
-
-			throw new AppError(ERROR_CODES.ROUTE_NOT_FOUND);
 		}
 
 		if (this.timetable.prepare) {
@@ -154,13 +144,11 @@ export class KakaoScheduledRouteProvider implements RouteProvider {
 			return null;
 		}
 
-		const topologiesWithWalks = usesKakaoLiveSchedule()
-			? topologies
-			: await Promise.all(
-					topologies.map((topology) =>
-						attachAccessWalks(topology, request.origin, request.destination, this.timetable)
-					)
-				);
+		const topologiesWithWalks = await Promise.all(
+			topologies.map((topology) =>
+				attachAccessWalks(topology, request.origin, request.destination, this.timetable)
+			)
+		);
 
 		const liveTemplate = mapKakaoRouteToLiveTemplate(
 			payload,
