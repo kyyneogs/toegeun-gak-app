@@ -1,7 +1,11 @@
 export const AUTH_PASSWORD_MIN_LENGTH = 8;
 export const AUTH_NICKNAME_MAX_LENGTH = 12;
-export const SESSION_COOKIE_NAME = 'tgk_session';
-export const SESSION_DAYS = 30;
+export const AUTH_CALLBACK_PATH = '/auth/callback';
+export const AUTH_RESET_PATH = '/auth/reset';
+
+export const AUTH_OAUTH_PROVIDERS = ['google', 'kakao'] as const;
+
+export type AuthOAuthProvider = (typeof AUTH_OAUTH_PROVIDERS)[number];
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -20,4 +24,8 @@ export function isValidPassword(password: string): boolean {
 export function isValidNickname(nickname: string): boolean {
 	const trimmed = nickname.trim();
 	return trimmed.length > 0 && trimmed.length <= AUTH_NICKNAME_MAX_LENGTH;
+}
+
+export function isAuthOAuthProvider(value: unknown): value is AuthOAuthProvider {
+	return typeof value === 'string' && (AUTH_OAUTH_PROVIDERS as readonly string[]).includes(value);
 }

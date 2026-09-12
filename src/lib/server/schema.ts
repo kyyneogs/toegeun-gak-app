@@ -1,25 +1,16 @@
 import { DEFAULT_STANDUP_LEAD_MINUTES } from '$lib/constants/persist';
 
 // 로컬 PGlite·DATABASE_URL(비-Vercel) 기동 시 적용. Vercel은 배포 전 sql/schema.sql 을 적용합니다.
+// PGlite에는 auth.users가 없어 users.id UUID에 FK를 걸지 않습니다.
 export const APP_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS users (
-	id TEXT PRIMARY KEY,
+	id UUID PRIMARY KEY,
 	email TEXT NOT NULL UNIQUE,
 	nickname TEXT NOT NULL,
-	password_hash TEXT NOT NULL,
-	password_salt TEXT NOT NULL,
 	ranking_opt_in BOOLEAN NOT NULL DEFAULT FALSE,
 	standup_lead_minutes INTEGER NOT NULL DEFAULT ${DEFAULT_STANDUP_LEAD_MINUTES},
 	created_at TIMESTAMPTZ NOT NULL
 );
-
-CREATE TABLE IF NOT EXISTS sessions (
-	token TEXT PRIMARY KEY,
-	user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-	expires_at TIMESTAMPTZ NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions (user_id);
 
 CREATE TABLE IF NOT EXISTS recommendation_snapshots (
 	id TEXT PRIMARY KEY,
@@ -29,7 +20,7 @@ CREATE TABLE IF NOT EXISTS recommendation_snapshots (
 
 CREATE TABLE IF NOT EXISTS commits (
 	id TEXT PRIMARY KEY,
-	user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+	user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
 	recommendation_id TEXT NOT NULL,
 	service_date TEXT NOT NULL,
 	committed_at TIMESTAMPTZ NOT NULL,
@@ -48,7 +39,7 @@ CREATE INDEX IF NOT EXISTS commits_user_committed_idx ON commits (user_id, commi
 CREATE INDEX IF NOT EXISTS commits_user_service_date_idx ON commits (user_id, service_date);
 
 CREATE TABLE IF NOT EXISTS push_subscriptions (
-	user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+	user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
 	endpoint TEXT NOT NULL,
 	p256dh TEXT NOT NULL,
 	auth TEXT NOT NULL,
@@ -57,7 +48,7 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 
 CREATE TABLE IF NOT EXISTS standup_jobs (
 	id TEXT PRIMARY KEY,
-	user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+	user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
 	fire_at TIMESTAMPTZ NOT NULL,
 	title TEXT NOT NULL,
 	body TEXT NOT NULL,
@@ -65,8 +56,6 @@ CREATE TABLE IF NOT EXISTS standup_jobs (
 );
 
 CREATE INDEX IF NOT EXISTS standup_jobs_due_idx ON standup_jobs (fire_at);
-
-ALTER TABLE users ADD COLUMN IF NOT EXISTS standup_lead_minutes INTEGER NOT NULL DEFAULT ${DEFAULT_STANDUP_LEAD_MINUTES};
 
 CREATE TABLE IF NOT EXISTS gtfs_routes (
 	route_id TEXT PRIMARY KEY,

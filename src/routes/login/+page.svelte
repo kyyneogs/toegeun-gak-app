@@ -1,14 +1,21 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
+	import AuthSocialButtons from '$lib/components/AuthSocialButtons.svelte';
 	import {
 		EMAIL_LABEL,
 		LOGIN_CTA,
 		LOGIN_TITLE,
 		PASSWORD_LABEL,
-		REGISTER_TITLE
+		REGISTER_TITLE,
+		RESET_PASSWORD_LINK
 	} from '$lib/constants/recommendation';
+	import { safeAuthReturnPath } from '$lib/domain/auth/return-path';
 	import { sessionStore } from '$lib/stores/session.svelte';
+
+	const next = $derived(safeAuthReturnPath(page.url.searchParams.get('next')));
+	const reason = $derived(page.url.searchParams.get('reason'));
 
 	let email = $state('');
 	let password = $state('');
@@ -18,7 +25,7 @@
 		const ok = await sessionStore.login(email, password);
 
 		if (ok) {
-			await goto(resolve('/'));
+			await goto(resolve(next));
 		}
 	}
 </script>
@@ -31,6 +38,8 @@
 
 <p class="large-title">{LOGIN_TITLE}</p>
 <p class="status-copy">알림과 아낀 시간을 다른 기기에서도 이어서 볼게요.</p>
+
+<AuthSocialButtons {next} />
 
 <form class="form" onsubmit={submit}>
 	<label class="field-block">
@@ -47,14 +56,17 @@
 			required
 		/>
 	</label>
-	{#if sessionStore.errorMessage}
-		<p class="status-copy">{sessionStore.errorMessage}</p>
+	{#if sessionStore.errorMessage || reason}
+		<p class="status-copy">{sessionStore.errorMessage ?? reason}</p>
 	{/if}
 	<button class="primary-button" type="submit">{LOGIN_CTA}</button>
 </form>
 
 <p class="status-copy">
 	<a class="nav-link" href={resolve('/register')}>{REGISTER_TITLE}</a>
+</p>
+<p class="status-copy">
+	<a class="nav-link" href={resolve('/auth/reset')}>{RESET_PASSWORD_LINK}</a>
 </p>
 
 <style>

@@ -1,11 +1,13 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { ERROR_USER_MESSAGES } from '$lib/constants/errors';
+import type { AuthOAuthProvider } from '$lib/domain/auth/credentials';
+import type { AuthReturnPath } from '$lib/domain/auth/return-path';
+import type { SessionUser } from '$lib/domain/auth/user';
 import {
 	scheduleStandupReminder,
 	standupReminderCopy
 } from '$lib/application/notify/standup-reminder';
-import type { SessionUser } from '$lib/domain/auth/user';
 import type { SavedTimeSummary } from '$lib/domain/commit/types';
 import { onboardingSession } from '$lib/stores/onboarding.svelte';
 import { settingsStore } from '$lib/stores/settings.svelte';
@@ -44,12 +46,102 @@ class SessionStore {
 		}
 	}
 
-	async register(email: string, password: string, nickname: string): Promise<boolean> {
-		return this.submitAuth('/api/auth/register', { email, password, nickname });
+	async register(
+		email: string,
+		password: string,
+		nickname: string
+	): Promise<'ok' | 'pending' | 'error'> {
+		this.errorMessage = null;
+
+		try {
+			const response = await fetch('/api/auth/register', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ email, password, nickname })
+			});
+			const payload = (await response.json()) as {
+				user?: SessionUser;
+				pendingVerification?: boolean;
+				message?: string;
+			};
+
+			if (payload.pendingVerification) {
+				return 'pending';
+			}
+
+			if (!response.ok || !payload.user) {
+				this.errorMessage = payload.message ?? ERROR_USER_MESSAGES.AUTH_INVALID;
+				return 'error';
+			}
+
+			this.user = payload.user;
+			onboardingSession.markCompleted();
+			await settingsStore.saveStandupLeadMinutes(payload.user.standupLeadMinutes);
+			return 'ok';
+		} catch (cause) {
+			console.error('Auth request failed', cause);
+			this.errorMessage = ERROR_USER_MESSAGES.NETWORK_ERROR;
+			return 'error';
+		}
 	}
 
 	async login(email: string, password: string): Promise<boolean> {
 		return this.submitAuth('/api/auth/login', { email, password });
+	}
+
+	async startOAuth(provider: AuthOAuthProvider, next: AuthReturnPath = '/'): Promise<void> {
+		this.errorMessage = null;
+
+		try {
+			const response = await fetch('/api/auth/oauth', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ provider, next })
+			});
+			const payload = (await response.json()) as { url?: string; message?: string };
+
+			if (!response.ok || !payload.url) {
+				this.errorMessage = payload.message ?? ERROR_USER_MESSAGES.AUTH_UNAVAILABLE;
+				return;
+			}
+
+			window.location.assign(payload.url);
+		} catch (cause) {
+			console.error('OAuth start failed', cause);
+			this.errorMessage = ERROR_USER_MESSAGES.NETWORK_ERROR;
+		}
+	}
+
+	async resendSignupEmail(email: string): Promise<boolean> {
+		return this.postEmailAction({ email, type: 'signup' });
+	}
+
+	async requestPasswordReset(email: string): Promise<boolean> {
+		return this.postEmailAction({ email, type: 'recovery' });
+	}
+
+	async updatePassword(password: string): Promise<boolean> {
+		this.errorMessage = null;
+
+		try {
+			const response = await fetch('/api/auth/password', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ password })
+			});
+			const payload = (await response.json()) as { ok?: boolean; message?: string };
+
+			if (!response.ok || !payload.ok) {
+				this.errorMessage = payload.message ?? ERROR_USER_MESSAGES.INVALID_REQUEST;
+				return false;
+			}
+
+			return true;
+		} catch (cause) {
+			console.error('Password update failed', cause);
+			this.errorMessage = ERROR_USER_MESSAGES.NETWORK_ERROR;
+			return false;
+		}
 	}
 
 	async logout(): Promise<void> {
@@ -161,6 +253,33 @@ class SessionStore {
 			return true;
 		} catch (cause) {
 			console.error('Auth request failed', cause);
+			this.errorMessage = ERROR_USER_MESSAGES.NETWORK_ERROR;
+			return false;
+		}
+	}
+
+	private async postEmailAction(body: {
+		email: string;
+		type: 'signup' | 'recovery';
+	}): Promise<boolean> {
+		this.errorMessage = null;
+
+		try {
+			const response = await fetch('/api/auth/email', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(body)
+			});
+			const payload = (await response.json()) as { ok?: boolean; message?: string };
+
+			if (!response.ok || !payload.ok) {
+				this.errorMessage = payload.message ?? ERROR_USER_MESSAGES.AUTH_UNAVAILABLE;
+				return false;
+			}
+
+			return true;
+		} catch (cause) {
+			console.error('Auth email action failed', cause);
 			this.errorMessage = ERROR_USER_MESSAGES.NETWORK_ERROR;
 			return false;
 		}

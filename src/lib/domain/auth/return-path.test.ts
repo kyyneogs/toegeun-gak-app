@@ -12,5 +12,6 @@ describe('safeAuthReturnPath', () => {
 	it('builds a login link that carries the return path', () => {
 		expect(loginPathWithReturn('/result')).toBe('/login?next=%2Fresult');
 		expect(loginPathWithReturn('/')).toBe('/login');
+		expect(safeAuthReturnPath('/auth/reset')).toBe('/auth/reset');
 	});
 });

@@ -8,7 +8,7 @@
 
 - TypeScript, Vite, SvelteKit (`@sveltejs/adapter-vercel`)
 - 1차 배포: **Vercel Functions + Supabase Postgres**. Fly는 이후 고도화입니다.
-- 계정·기록: Postgres (`DATABASE_URL`). 로컬만 키가 없으면 PGlite
+- 계정·기록: Postgres (`DATABASE_URL`). 로그인은 **Supabase Auth**. 로컬만 키가 없으면 PGlite(프로필 테스트용, 실제 로그인 아님)
 - 장소 검색: Kakao Maps JavaScript SDK
 - 경로: Kakao REST `publictraffic` (서버 전용 키)
 - 시각표: `DATABASE_URL`이 있으면 Supabase `gtfs_*`만 씁니다. 키가 없을 때만 로컬 `GTFS_DIR` CSV / PGlite
@@ -33,23 +33,25 @@ npm run dev
 
 ## 환경 변수
 
-| 이름                  | 위치     | 역할                                                                                         |
-| --------------------- | -------- | -------------------------------------------------------------------------------------------- |
-| `PUBLIC_KAKAO_JS_KEY` | 브라우저 | 장소 검색. 없으면 Mock 장소를 씁니다.                                                        |
-| `KAKAO_REST_API_KEY`  | 서버만   | 대중교통 경로. `PUBLIC_` 접두사 금지. 없으면 Mock 경로를 씁니다.                             |
-| `GTFS_DIR`            | 로컬만   | 압축 푼 GTFS 폴더. 비우면 `./data/gtfs-seoul-seongnam`. **Vercel에는 넣지 마세요.**          |
-| `DATABASE_URL`        | 서버만   | Postgres. 앱은 트랜잭션 풀러 `:6543`. COPY 적재는 세션 `:5432`. Vercel 필수. `PUBLIC_` 금지. |
-| `VAPID_PUBLIC_KEY`    | 서버만   | 웹 푸시 공개키. 클라이언트는 `/api/push/vapid`로만 받습니다.                                 |
-| `VAPID_PRIVATE_KEY`   | 서버만   | 웹 푸시 비밀키. `PUBLIC_` 금지.                                                              |
-| `VAPID_SUBJECT`       | 서버만   | 웹 푸시 `mailto:` 또는 `https:` 연락처.                                                      |
-| `CRON_SECRET`         | 서버만   | Vercel Cron이 `Authorization: Bearer`로 보냅니다. 기동 시 `setInterval` 푸시는 끕니다.       |
+| 이름                       | 위치     | 역할                                                                                         |
+| -------------------------- | -------- | -------------------------------------------------------------------------------------------- |
+| `PUBLIC_KAKAO_JS_KEY`      | 브라우저 | 장소 검색. 없으면 Mock 장소를 씁니다.                                                        |
+| `KAKAO_REST_API_KEY`       | 서버만   | 대중교통 경로. `PUBLIC_` 접두사 금지. 없으면 Mock 경로를 씁니다.                             |
+| `GTFS_DIR`                 | 로컬만   | 압축 푼 GTFS 폴더. 비우면 `./data/gtfs-seoul-seongnam`. **Vercel에는 넣지 마세요.**          |
+| `DATABASE_URL`             | 서버만   | Postgres. 앱은 트랜잭션 풀러 `:6543`. COPY 적재는 세션 `:5432`. Vercel 필수. `PUBLIC_` 금지. |
+| `PUBLIC_SUPABASE_URL`      | 브라우저 | Auth 프로젝트 URL. `https://xxxx.supabase.co`. 로그인·가입·OAuth에 필요합니다.               |
+| `PUBLIC_SUPABASE_ANON_KEY` | 브라우저 | Auth anon/publishable 키. `service_role` 금지.                                               |
+| `VAPID_PUBLIC_KEY`         | 서버만   | 웹 푸시 공개키. 클라이언트는 `/api/push/vapid`로만 받습니다.                                 |
+| `VAPID_PRIVATE_KEY`        | 서버만   | 웹 푸시 비밀키. `PUBLIC_` 금지.                                                              |
+| `VAPID_SUBJECT`            | 서버만   | 웹 푸시 `mailto:` 또는 `https:` 연락처.                                                      |
+| `CRON_SECRET`              | 서버만   | Vercel Cron이 `Authorization: Bearer`로 보냅니다. 기동 시 `setInterval` 푸시는 끕니다.       |
 
 상대 경로는 개발 서버를 켠 폴더 기준입니다. 안 읽히면 절대 경로를 쓰세요.
 
 ## 1차 배포 (Vercel + Supabase)
 
-1. Supabase SQL 에디터에 [`sql/schema.sql`](sql/schema.sql)을 **배포 전에** 적용합니다. 앱은 Vercel에서 `CREATE IF NOT EXISTS`를 돌리지 않습니다.
-2. GitHub 저장소 루트가 이미 앱입니다. Vercel **Root Directory는 비웁니다.** (로컬 폴더 이름이 `dev/`여도 원격에는 `dev/dev`가 없습니다.) Env에 `DATABASE_URL`(트랜잭션 풀러 `:6543`), `KAKAO_REST_API_KEY`, `PUBLIC_KAKAO_JS_KEY`, `VAPID_*`, `CRON_SECRET`을 넣습니다. `GTFS_DIR`은 넣지 않습니다. 함수 런타임은 Node 22입니다.
+1. Supabase SQL 에디터에 [`sql/schema.sql`](sql/schema.sql)을 **배포 전에** 적용합니다. 앱은 Vercel에서 `CREATE IF NOT EXISTS`를 돌리지 않습니다. 이 파일은 유저 테이블을 지우고 `users.id`를 `auth.users.id`와 맞춥니다. GTFS는 유지합니다.
+2. GitHub 저장소 루트가 이미 앱입니다. Vercel **Root Directory는 비웁니다.** (로컬 폴더 이름이 `dev/`여도 원격에는 `dev/dev`가 없습니다.) Env에 `DATABASE_URL`(트랜잭션 풀러 `:6543`), `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY`, `KAKAO_REST_API_KEY`, `PUBLIC_KAKAO_JS_KEY`, `VAPID_*`, `CRON_SECRET`을 넣습니다. `GTFS_DIR`은 넣지 않습니다. 함수 런타임은 Node 22입니다.
 3. 로컬에서 피드를 푼 뒤 **서울·성남 슬라이스**만 DB에 올립니다. 전체 `stop_times`를 넣지 마세요.
 
 ```sh

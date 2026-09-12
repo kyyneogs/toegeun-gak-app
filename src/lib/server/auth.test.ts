@@ -1,6 +1,12 @@
 import { ERROR_CODES } from '$lib/constants/errors';
 import { AppError } from '$lib/domain/errors';
-import { authenticateUser, registerUser, toPublicUser, updateUserProfile } from '$lib/server/auth';
+import {
+	appErrorFromSupabaseAuth,
+	ensureAppUser,
+	insertTestUser,
+	toPublicUser,
+	updateUserProfile
+} from '$lib/server/auth';
 import { createCommit } from '$lib/server/commits';
 import { resetDatabaseForTests } from '$lib/server/db';
 import {
@@ -15,18 +21,16 @@ afterEach(async () => {
 });
 
 describe('auth and commits', () => {
-	it('registers a user and rejects a duplicate email', async () => {
-		const user = await registerUser({
+	it('inserts a user and rejects a duplicate email', async () => {
+		const user = await insertTestUser({
 			email: 'a@b.com',
-			password: 'password1',
 			nickname: '퇴근러'
 		});
 		expect(toPublicUser(user).email).toBe('a@b.com');
 
 		try {
-			await registerUser({
+			await insertTestUser({
 				email: 'A@b.com',
-				password: 'password1',
 				nickname: '다른사람'
 			});
 			expect.fail('should throw');
@@ -35,20 +39,32 @@ describe('auth and commits', () => {
 		}
 	});
 
-	it('authenticates with the same password', async () => {
-		await registerUser({
-			email: 'a@b.com',
-			password: 'password1',
-			nickname: '퇴근러'
-		});
-		const user = await authenticateUser('a@b.com', 'password1');
-		expect(user.nickname).toBe('퇴근러');
+	it('maps supabase auth errors', () => {
+		expect(appErrorFromSupabaseAuth('Email not confirmed').code).toBe(ERROR_CODES.AUTH_UNVERIFIED);
+		expect(appErrorFromSupabaseAuth('User already registered').code).toBe(
+			ERROR_CODES.AUTH_CONFLICT
+		);
+		expect(appErrorFromSupabaseAuth('Invalid login credentials').code).toBe(
+			ERROR_CODES.AUTH_INVALID
+		);
+	});
+
+	it('upserts a profile from an auth user', async () => {
+		const authUser = {
+			id: '11111111-1111-4111-8111-111111111111',
+			email: 'oauth@b.com',
+			user_metadata: { nickname: '오쓰러' }
+		};
+		const created = await ensureAppUser(authUser as never);
+		expect(created.nickname).toBe('오쓰러');
+		const again = await ensureAppUser({ ...authUser, email: 'oauth+alias@b.com' } as never);
+		expect(again.email).toBe('oauth+alias@b.com');
+		expect(again.id).toBe(created.id);
 	});
 
 	it('stores a commit from the server snapshot, not client times', async () => {
-		const user = await registerUser({
+		const user = await insertTestUser({
 			email: 'a@b.com',
-			password: 'password1',
 			nickname: '퇴근러'
 		});
 		await saveRecommendationSnapshot('rec_1', {
@@ -74,9 +90,8 @@ describe('auth and commits', () => {
 	});
 
 	it('rejects a commit when the recommendation snapshot is missing', async () => {
-		const user = await registerUser({
+		const user = await insertTestUser({
 			email: 'a@b.com',
-			password: 'password1',
 			nickname: '퇴근러'
 		});
 
@@ -116,14 +131,12 @@ describe('auth and commits', () => {
 	});
 
 	it('ranks only opt-in nicknames and never returns user ids', async () => {
-		const visible = await registerUser({
+		const visible = await insertTestUser({
 			email: 'open@b.com',
-			password: 'password1',
 			nickname: '공개러'
 		});
-		const hidden = await registerUser({
+		const hidden = await insertTestUser({
 			email: 'hidden@b.com',
-			password: 'password1',
 			nickname: '비공개'
 		});
 		await updateUserProfile(visible.id, { rankingOptIn: true });

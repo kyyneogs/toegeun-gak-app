@@ -27,9 +27,12 @@ function statusFor(code: ErrorCode): number {
 	switch (code) {
 		case ERROR_CODES.AUTH_REQUIRED:
 		case ERROR_CODES.AUTH_INVALID:
+		case ERROR_CODES.AUTH_UNVERIFIED:
 			return 401;
 		case ERROR_CODES.AUTH_CONFLICT:
 			return 409;
+		case ERROR_CODES.AUTH_UNAVAILABLE:
+			return 503;
 		case ERROR_CODES.INVALID_REQUEST:
 			return 400;
 		default:

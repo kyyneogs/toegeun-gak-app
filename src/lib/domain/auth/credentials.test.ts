@@ -4,6 +4,7 @@ import {
 	isValidEmail,
 	isValidNickname,
 	isValidPassword,
+	isAuthOAuthProvider,
 	normalizeEmail
 } from '$lib/domain/auth/credentials';
 import { describe, expect, it } from 'vitest';
@@ -21,5 +22,7 @@ describe('auth credentials', () => {
 		expect(AUTH_PASSWORD_MIN_LENGTH).toBe(8);
 		expect(isValidNickname('퇴근러')).toBe(true);
 		expect(isValidNickname('x'.repeat(AUTH_NICKNAME_MAX_LENGTH + 1))).toBe(false);
+		expect(isAuthOAuthProvider('kakao')).toBe(true);
+		expect(isAuthOAuthProvider('naver')).toBe(false);
 	});
 });

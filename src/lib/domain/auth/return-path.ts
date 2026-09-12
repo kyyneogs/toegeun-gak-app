@@ -1,4 +1,13 @@
-export const AUTH_RETURN_PATHS = ['/', '/result', '/settings', '/record', '/ranking'] as const;
+import { AUTH_RESET_PATH } from '$lib/domain/auth/credentials';
+
+export const AUTH_RETURN_PATHS = [
+	'/',
+	'/result',
+	'/settings',
+	'/record',
+	'/ranking',
+	AUTH_RESET_PATH
+] as const;
 
 export type AuthReturnPath = (typeof AUTH_RETURN_PATHS)[number];
 
@@ -22,4 +31,10 @@ export function loginPathWithReturn(next: AuthReturnPath): string {
 	}
 
 	return `/login?next=${encodeURIComponent(next)}`;
+}
+
+export function loginPathWithReason(next: AuthReturnPath, reason: string): string {
+	const base = loginPathWithReturn(next);
+	const separator = base.includes('?') ? '&' : '?';
+	return `${base}${separator}reason=${encodeURIComponent(reason)}`;
 }

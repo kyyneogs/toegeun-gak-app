@@ -6,8 +6,6 @@ export function mapUser(row: Record<string, unknown>): StoredUser {
 		id: String(row.id),
 		email: String(row.email),
 		nickname: String(row.nickname),
-		passwordHash: String(row.password_hash),
-		passwordSalt: String(row.password_salt),
 		rankingOptIn: asBoolean(row.ranking_opt_in),
 		standupLeadMinutes: clampStandupLeadMinutes(row.standup_lead_minutes),
 		createdAt: toIsoText(row.created_at)

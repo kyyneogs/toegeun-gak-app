@@ -2,8 +2,6 @@ export interface StoredUser {
 	id: string;
 	email: string;
 	nickname: string;
-	passwordHash: string;
-	passwordSalt: string;
 	rankingOptIn: boolean;
 	standupLeadMinutes: number;
 	createdAt: string;

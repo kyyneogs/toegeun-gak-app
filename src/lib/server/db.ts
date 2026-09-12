@@ -33,7 +33,6 @@ export async function resetDatabaseForTests(): Promise<void> {
 	await query('DELETE FROM push_subscriptions');
 	await query('DELETE FROM commits');
 	await query('DELETE FROM recommendation_snapshots');
-	await query('DELETE FROM sessions');
 	await query('DELETE FROM users');
 	await query('DELETE FROM gtfs_stop_times');
 	await query('DELETE FROM gtfs_trips');
@@ -139,6 +138,7 @@ async function createClient(): Promise<DatabaseClient> {
 	};
 	console.info('Database: local PGlite');
 	await dropLegacyGtfsTablesIfNeeded(client);
+	await dropLegacyAuthTablesIfNeeded(client);
 	await applySchema(client);
 	return client;
 }
@@ -170,6 +170,35 @@ async function dropLegacyGtfsTablesIfNeeded(client: DatabaseClient): Promise<voi
 		await client.exec(DROP_LEGACY_GTFS_SQL);
 	} catch (cause) {
 		console.error('GTFS schema compatibility check failed', cause);
+	}
+}
+
+const DROP_LEGACY_AUTH_SQL = `
+DROP TABLE IF EXISTS standup_jobs CASCADE;
+DROP TABLE IF EXISTS push_subscriptions CASCADE;
+DROP TABLE IF EXISTS commits CASCADE;
+DROP TABLE IF EXISTS sessions CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+`.trim();
+
+async function dropLegacyAuthTablesIfNeeded(client: DatabaseClient): Promise<void> {
+	try {
+		const passwordColumn = await client.query<{ column_name: string }>(
+			`SELECT column_name
+			 FROM information_schema.columns
+			 WHERE table_schema = 'public'
+			   AND table_name = 'users'
+			   AND column_name = 'password_hash'`
+		);
+
+		if (passwordColumn.length === 0) {
+			return;
+		}
+
+		console.warn('Dropping legacy password/session user tables for Supabase Auth');
+		await client.exec(DROP_LEGACY_AUTH_SQL);
+	} catch (cause) {
+		console.error('Auth schema compatibility check failed', cause);
 	}
 }
 

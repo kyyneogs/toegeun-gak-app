@@ -1,28 +1,16 @@
-import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
-import { promisify } from 'node:util';
 import type { Cookies } from '@sveltejs/kit';
-import type { SessionUser } from '$lib/domain/auth/user';
+import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { ERROR_CODES } from '$lib/constants/errors';
 import { clampStandupLeadMinutes, DEFAULT_STANDUP_LEAD_MINUTES } from '$lib/constants/persist';
-import {
-	SESSION_COOKIE_NAME,
-	SESSION_DAYS,
-	isValidEmail,
-	isValidNickname,
-	isValidPassword,
-	normalizeEmail
-} from '$lib/domain/auth/credentials';
+import type { SessionUser } from '$lib/domain/auth/user';
+import { isValidEmail, isValidNickname, normalizeEmail } from '$lib/domain/auth/credentials';
+import { nicknameFromAuthMetadata } from '$lib/domain/auth/nickname';
 import { AppError } from '$lib/domain/errors';
 import { isUniqueViolation, query, queryOne } from '$lib/server/db';
 import { mapUser } from '$lib/server/row-map';
 import type { StoredUser } from '$lib/server/store-types';
-import { createId } from '$lib/utils/id';
-import { addMinutes, toIso } from '$lib/utils/time';
-
-const scrypt = promisify(scryptCallback);
-const HASH_LENGTH = 64;
-const SALT_LENGTH = 16;
-const TOKEN_LENGTH = 32;
+import { createSupabaseServerClient } from '$lib/server/supabase';
+import { toIso } from '$lib/utils/time';
 
 export type PublicUser = SessionUser;
 
@@ -36,28 +24,19 @@ export function toPublicUser(user: StoredUser): PublicUser {
 	};
 }
 
-export async function registerUser(input: {
+export async function insertTestUser(input: {
 	email: string;
-	password: string;
 	nickname: string;
+	id?: string;
 }): Promise<StoredUser> {
-	if (
-		!isValidEmail(input.email) ||
-		!isValidPassword(input.password) ||
-		!isValidNickname(input.nickname)
-	) {
+	if (!isValidEmail(input.email) || !isValidNickname(input.nickname)) {
 		throw new AppError(ERROR_CODES.INVALID_REQUEST);
 	}
 
-	const email = normalizeEmail(input.email);
-	const passwordSalt = randomBytes(SALT_LENGTH).toString('hex');
-	const passwordHash = await hashPassword(input.password, passwordSalt);
 	const user: StoredUser = {
-		id: createId('user'),
-		email,
+		id: input.id ?? crypto.randomUUID(),
+		email: normalizeEmail(input.email),
 		nickname: input.nickname.trim(),
-		passwordHash,
-		passwordSalt,
 		rankingOptIn: false,
 		standupLeadMinutes: DEFAULT_STANDUP_LEAD_MINUTES,
 		createdAt: toIso(new Date())
@@ -66,14 +45,12 @@ export async function registerUser(input: {
 	try {
 		await query(
 			`INSERT INTO users (
-				id, email, nickname, password_hash, password_salt, ranking_opt_in, standup_lead_minutes, created_at
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+				id, email, nickname, ranking_opt_in, standup_lead_minutes, created_at
+			) VALUES ($1, $2, $3, $4, $5, $6)`,
 			[
 				user.id,
 				user.email,
 				user.nickname,
-				user.passwordHash,
-				user.passwordSalt,
 				user.rankingOptIn,
 				user.standupLeadMinutes,
 				user.createdAt
@@ -90,75 +67,94 @@ export async function registerUser(input: {
 	return user;
 }
 
-export async function authenticateUser(email: string, password: string): Promise<StoredUser> {
-	if (!isValidEmail(email) || !isValidPassword(password)) {
-		throw new AppError(ERROR_CODES.AUTH_INVALID);
+export async function ensureAppUser(authUser: User): Promise<PublicUser> {
+	const email = authUser.email ? normalizeEmail(authUser.email) : '';
+
+	if (!isValidEmail(email)) {
+		throw new AppError(ERROR_CODES.AUTH_EMAIL_REQUIRED);
 	}
 
-	const row = await queryOne('SELECT * FROM users WHERE email = $1', [normalizeEmail(email)]);
+	const existing = await queryOne('SELECT * FROM users WHERE id = $1', [authUser.id]);
+	const nickname = nicknameFromAuthMetadata(email, asStringRecord(authUser.user_metadata));
 
-	if (!row) {
-		throw new AppError(ERROR_CODES.AUTH_INVALID);
+	if (!existing) {
+		const created: StoredUser = {
+			id: authUser.id,
+			email,
+			nickname,
+			rankingOptIn: false,
+			standupLeadMinutes: DEFAULT_STANDUP_LEAD_MINUTES,
+			createdAt: toIso(new Date())
+		};
+
+		try {
+			await query(
+				`INSERT INTO users (
+					id, email, nickname, ranking_opt_in, standup_lead_minutes, created_at
+				) VALUES ($1, $2, $3, $4, $5, $6)`,
+				[
+					created.id,
+					created.email,
+					created.nickname,
+					created.rankingOptIn,
+					created.standupLeadMinutes,
+					created.createdAt
+				]
+			);
+		} catch (cause) {
+			if (!isUniqueViolation(cause)) {
+				throw cause;
+			}
+
+			const raced = await queryOne('SELECT * FROM users WHERE id = $1', [authUser.id]);
+
+			if (!raced) {
+				throw new AppError(ERROR_CODES.AUTH_REQUIRED);
+			}
+
+			return toPublicUser(mapUser(raced));
+		}
+
+		return toPublicUser(created);
 	}
 
-	const user = mapUser(row);
-	const hash = await hashPassword(password, user.passwordSalt);
+	const stored = mapUser(existing);
 
-	if (!safeEqualHex(hash, user.passwordHash)) {
-		throw new AppError(ERROR_CODES.AUTH_INVALID);
+	if (stored.email !== email) {
+		await query('UPDATE users SET email = $1 WHERE id = $2', [email, stored.id]);
+		return toPublicUser({ ...stored, email });
 	}
 
-	return user;
-}
-
-export async function createSession(userId: string, cookies: Cookies): Promise<void> {
-	const token = randomBytes(TOKEN_LENGTH).toString('hex');
-	const expiresAt = addMinutes(new Date(), SESSION_DAYS * 24 * 60);
-
-	await query('DELETE FROM sessions WHERE user_id = $1 OR expires_at <= $2', [
-		userId,
-		toIso(new Date())
-	]);
-	await query('INSERT INTO sessions (token, user_id, expires_at) VALUES ($1, $2, $3)', [
-		token,
-		userId,
-		toIso(expiresAt)
-	]);
-
-	cookies.set(SESSION_COOKIE_NAME, token, {
-		path: '/',
-		httpOnly: true,
-		sameSite: 'lax',
-		secure: process.env.NODE_ENV === 'production',
-		expires: expiresAt
-	});
-}
-
-export async function destroySession(cookies: Cookies): Promise<void> {
-	const token = cookies.get(SESSION_COOKIE_NAME);
-
-	if (token) {
-		await query('DELETE FROM sessions WHERE token = $1', [token]);
-	}
-
-	cookies.delete(SESSION_COOKIE_NAME, { path: '/' });
+	return toPublicUser(stored);
 }
 
 export async function userFromCookies(cookies: Cookies): Promise<PublicUser | null> {
-	const token = cookies.get(SESSION_COOKIE_NAME);
+	return userFromSupabase(createSupabaseServerClient(cookies));
+}
 
-	if (!token) {
+export async function userFromSupabase(
+	supabase: SupabaseClient | null
+): Promise<PublicUser | null> {
+	if (!supabase) {
 		return null;
 	}
 
-	const row = await queryOne(
-		`SELECT users.* FROM users
-		INNER JOIN sessions ON sessions.user_id = users.id
-		WHERE sessions.token = $1 AND sessions.expires_at > $2`,
-		[token, toIso(new Date())]
-	);
+	const { data, error } = await supabase.auth.getUser();
 
-	return row ? toPublicUser(mapUser(row)) : null;
+	if (error || !data.user) {
+		return null;
+	}
+
+	if (!data.user.email_confirmed_at && !hasOAuthIdentity(data.user)) {
+		return null;
+	}
+
+	try {
+		return await ensureAppUser(data.user);
+	} catch (cause) {
+		console.error('ensureAppUser failed', cause);
+		return null;
+	}
 }
 
 export async function requireUser(cookies: Cookies): Promise<PublicUser> {
@@ -169,6 +165,20 @@ export async function requireUser(cookies: Cookies): Promise<PublicUser> {
 	}
 
 	return user;
+}
+
+export async function destroySession(cookies: Cookies): Promise<void> {
+	const supabase = createSupabaseServerClient(cookies);
+
+	if (!supabase) {
+		return;
+	}
+
+	const { error } = await supabase.auth.signOut();
+
+	if (error) {
+		console.error('Supabase signOut failed', error);
+	}
 }
 
 export async function updateUserProfile(
@@ -207,18 +217,32 @@ export async function updateUserProfile(
 	};
 }
 
-async function hashPassword(password: string, saltHex: string): Promise<string> {
-	const derived = (await scrypt(password, Buffer.from(saltHex, 'hex'), HASH_LENGTH)) as Buffer;
-	return derived.toString('hex');
-}
+export function appErrorFromSupabaseAuth(message: string): AppError {
+	const lower = message.toLowerCase();
 
-function safeEqualHex(left: string, right: string): boolean {
-	const leftBuffer = Buffer.from(left, 'hex');
-	const rightBuffer = Buffer.from(right, 'hex');
-
-	if (leftBuffer.length !== rightBuffer.length) {
-		return false;
+	if (lower.includes('email not confirmed') || lower.includes('not confirmed')) {
+		return new AppError(ERROR_CODES.AUTH_UNVERIFIED);
 	}
 
-	return timingSafeEqual(leftBuffer, rightBuffer);
+	if (lower.includes('already registered') || lower.includes('already been registered')) {
+		return new AppError(ERROR_CODES.AUTH_CONFLICT);
+	}
+
+	if (lower.includes('invalid login') || lower.includes('invalid credentials')) {
+		return new AppError(ERROR_CODES.AUTH_INVALID);
+	}
+
+	return new AppError(ERROR_CODES.AUTH_INVALID);
+}
+
+function hasOAuthIdentity(user: User): boolean {
+	return (user.identities ?? []).some((identity) => identity.provider !== 'email');
+}
+
+function asStringRecord(value: unknown): Record<string, unknown> | undefined {
+	if (typeof value === 'object' && value !== null) {
+		return value as Record<string, unknown>;
+	}
+
+	return undefined;
 }

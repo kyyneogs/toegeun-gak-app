@@ -1,6 +1,7 @@
 declare global {
 	namespace App {
 		interface Locals {
+			supabase: import('@supabase/supabase-js').SupabaseClient | null;
 			user: import('$lib/domain/auth/user').SessionUser | null;
 		}
 	}

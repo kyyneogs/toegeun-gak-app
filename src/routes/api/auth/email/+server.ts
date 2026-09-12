@@ -1,14 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { ERROR_CODES } from '$lib/constants/errors';
-import {
-	AUTH_CALLBACK_PATH,
-	isValidEmail,
-	isValidNickname,
-	isValidPassword,
-	normalizeEmail
-} from '$lib/domain/auth/credentials';
+import { AUTH_CALLBACK_PATH, isValidEmail, normalizeEmail } from '$lib/domain/auth/credentials';
 import { AppError } from '$lib/domain/errors';
-import { appErrorFromSupabaseAuth, ensureAppUser } from '$lib/server/auth';
 import { jsonError } from '$lib/server/json-error';
 import { requireSupabase } from '$lib/server/supabase';
 
@@ -17,32 +10,37 @@ export async function POST({ request, cookies, url }) {
 		const supabase = requireSupabase(cookies);
 		const record = asRecord(await request.json());
 		const email = normalizeEmail(stringField(record, 'email'));
-		const password = stringField(record, 'password');
-		const nickname = stringField(record, 'nickname').trim();
 
-		if (!isValidEmail(email) || !isValidPassword(password) || !isValidNickname(nickname)) {
+		if (!isValidEmail(email)) {
 			throw new AppError(ERROR_CODES.INVALID_REQUEST);
 		}
 
-		const { data, error } = await supabase.auth.signUp({
-			email,
-			password,
-			options: {
-				data: { nickname },
-				emailRedirectTo: `${url.origin}${AUTH_CALLBACK_PATH}`
+		const type = record.type === 'signup' ? 'signup' : 'recovery';
+		const redirectTo = `${url.origin}${AUTH_CALLBACK_PATH}`;
+
+		if (type === 'signup') {
+			const { error } = await supabase.auth.resend({
+				type: 'signup',
+				email,
+				options: { emailRedirectTo: redirectTo }
+			});
+
+			if (error) {
+				throw new AppError(ERROR_CODES.AUTH_UNAVAILABLE);
 			}
+
+			return json({ ok: true });
+		}
+
+		const { error } = await supabase.auth.resetPasswordForEmail(email, {
+			redirectTo: `${url.origin}${AUTH_CALLBACK_PATH}?next=${encodeURIComponent('/auth/reset')}`
 		});
 
 		if (error) {
-			throw appErrorFromSupabaseAuth(error.message);
+			throw new AppError(ERROR_CODES.AUTH_UNAVAILABLE);
 		}
 
-		if (data.session && data.user) {
-			const user = await ensureAppUser(data.user);
-			return json({ user });
-		}
-
-		return json({ pendingVerification: true });
+		return json({ ok: true });
 	} catch (cause) {
 		if (cause instanceof SyntaxError) {
 			return jsonError(new AppError(ERROR_CODES.INVALID_REQUEST));

@@ -1,22 +1,20 @@
 -- 배포 전에 Supabase SQL 에디터에 적용합니다. Vercel 기동 시 CREATE 하지 않습니다.
-CREATE TABLE IF NOT EXISTS users (
-	id TEXT PRIMARY KEY,
+-- 유저 관련 테이블을 비우고 Auth uid(UUID) 프로필로 바꿉니다. GTFS·recommendation_snapshots는 유지합니다.
+-- auth.users 삭제는 Dashboard Authentication > Users, 또는 privileged SQL: DELETE FROM auth.users;
+DROP TABLE IF EXISTS standup_jobs CASCADE;
+DROP TABLE IF EXISTS push_subscriptions CASCADE;
+DROP TABLE IF EXISTS commits CASCADE;
+DROP TABLE IF EXISTS sessions CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+CREATE TABLE users (
+	id UUID PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
 	email TEXT NOT NULL UNIQUE,
 	nickname TEXT NOT NULL,
-	password_hash TEXT NOT NULL,
-	password_salt TEXT NOT NULL,
 	ranking_opt_in BOOLEAN NOT NULL DEFAULT FALSE,
 	standup_lead_minutes INTEGER NOT NULL DEFAULT 5,
 	created_at TIMESTAMPTZ NOT NULL
 );
-
-CREATE TABLE IF NOT EXISTS sessions (
-	token TEXT PRIMARY KEY,
-	user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-	expires_at TIMESTAMPTZ NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions (user_id);
 
 CREATE TABLE IF NOT EXISTS recommendation_snapshots (
 	id TEXT PRIMARY KEY,
@@ -24,9 +22,9 @@ CREATE TABLE IF NOT EXISTS recommendation_snapshots (
 	expires_at TIMESTAMPTZ NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS commits (
+CREATE TABLE commits (
 	id TEXT PRIMARY KEY,
-	user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+	user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
 	recommendation_id TEXT NOT NULL,
 	service_date TEXT NOT NULL,
 	committed_at TIMESTAMPTZ NOT NULL,
@@ -44,17 +42,17 @@ CREATE INDEX IF NOT EXISTS commits_committed_at_idx ON commits (committed_at);
 CREATE INDEX IF NOT EXISTS commits_user_committed_idx ON commits (user_id, committed_at);
 CREATE INDEX IF NOT EXISTS commits_user_service_date_idx ON commits (user_id, service_date);
 
-CREATE TABLE IF NOT EXISTS push_subscriptions (
-	user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+CREATE TABLE push_subscriptions (
+	user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
 	endpoint TEXT NOT NULL,
 	p256dh TEXT NOT NULL,
 	auth TEXT NOT NULL,
 	PRIMARY KEY (user_id, endpoint)
 );
 
-CREATE TABLE IF NOT EXISTS standup_jobs (
+CREATE TABLE standup_jobs (
 	id TEXT PRIMARY KEY,
-	user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+	user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
 	fire_at TIMESTAMPTZ NOT NULL,
 	title TEXT NOT NULL,
 	body TEXT NOT NULL,
@@ -63,7 +61,41 @@ CREATE TABLE IF NOT EXISTS standup_jobs (
 
 CREATE INDEX IF NOT EXISTS standup_jobs_due_idx ON standup_jobs (fire_at);
 
-ALTER TABLE users ADD COLUMN IF NOT EXISTS standup_lead_minutes INTEGER NOT NULL DEFAULT 5;
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+	chosen text;
+BEGIN
+	chosen := COALESCE(
+		NULLIF(btrim(NEW.raw_user_meta_data ->> 'nickname'), ''),
+		NULLIF(btrim(NEW.raw_user_meta_data ->> 'full_name'), ''),
+		NULLIF(btrim(NEW.raw_user_meta_data ->> 'name'), ''),
+		NULLIF(btrim(NEW.raw_user_meta_data ->> 'preferred_username'), ''),
+		split_part(COALESCE(NEW.email, '퇴근러'), '@', 1)
+	);
+	chosen := left(chosen, 12);
+
+	IF chosen = '' THEN
+		chosen := '퇴근러';
+	END IF;
+
+	INSERT INTO public.users (id, email, nickname, ranking_opt_in, standup_lead_minutes, created_at)
+	VALUES (NEW.id, COALESCE(NEW.email, ''), chosen, FALSE, 5, now())
+	ON CONFLICT (id) DO NOTHING;
+
+	RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+	AFTER INSERT ON auth.users
+	FOR EACH ROW
+	EXECUTE FUNCTION public.handle_new_user();
 
 CREATE TABLE IF NOT EXISTS gtfs_routes (
 	route_id TEXT PRIMARY KEY,
