@@ -17,7 +17,8 @@ import {
 	extractRouteShortName,
 	isStopNameMatch,
 	normalizeStopName,
-	routeShortNameKeys
+	routeShortNameKeys,
+	uniqueStopNameLookups
 } from '$lib/adapters/gtfs/gtfs-match';
 import type { TripChoice } from '$lib/domain/optimization/types';
 import type { NextTripQuery, TimetablePort } from '$lib/ports/timetable-port';
@@ -44,6 +45,7 @@ interface GtfsIndex {
 	routeIdsByShortName: Map<string, string[]>;
 	stopIdsByExactName: Map<string, string[]>;
 	stopIdsByNormalizedName: Map<string, string[]>;
+	stopNameById: Map<string, string>;
 	tripsByRouteId: Map<string, TripRecord[]>;
 	calendarByServiceId: Map<string, GtfsCalendarWindow>;
 	calendarDateExceptions: Map<string, string>;
@@ -51,6 +53,7 @@ interface GtfsIndex {
 }
 
 export class GtfsTimetable implements TimetablePort {
+	readonly source = 'csv' as const;
 	private indexPromise: Promise<GtfsIndex> | null = null;
 	private readonly stopTimesByTrip = new Map<string, StopTimePoint[]>();
 	private readonly loadedTripIds = new Set<string>();
@@ -91,15 +94,11 @@ export class GtfsTimetable implements TimetablePort {
 	async findNextTrip(query: NextTripQuery): Promise<TripChoice | null> {
 		const index = await this.ensureIndex();
 		const routeIds = resolveRouteIds(index, query.routeId);
-		const boardStopIds = matchStopIds(index, query.boardStopName);
-		const alightStopIds = matchStopIds(index, query.alightStopName);
 
-		if (routeIds.length === 0 || boardStopIds.length === 0 || alightStopIds.length === 0) {
+		if (routeIds.length === 0) {
 			return null;
 		}
 
-		const boardStops = new Set(boardStopIds);
-		const alightStops = new Set(alightStopIds);
 		const activeTrips = collectActiveTrips(index, routeIds, query.serviceDate);
 
 		if (activeTrips.length === 0) {
@@ -107,6 +106,31 @@ export class GtfsTimetable implements TimetablePort {
 		}
 
 		await this.ensureStopTimes(activeTrips.map((trip) => trip.tripId));
+
+		const boardStops = new Set<string>();
+		const alightStops = new Set<string>();
+
+		for (const trip of activeTrips) {
+			for (const point of this.stopTimesByTrip.get(trip.tripId) ?? []) {
+				const stopName = index.stopNameById.get(point.stopId);
+
+				if (!stopName) {
+					continue;
+				}
+
+				if (isStopNameMatch(query.boardStopName, stopName)) {
+					boardStops.add(point.stopId);
+				}
+
+				if (isStopNameMatch(query.alightStopName, stopName)) {
+					alightStops.add(point.stopId);
+				}
+			}
+		}
+
+		if (boardStops.size === 0 || alightStops.size === 0) {
+			return null;
+		}
 
 		const afterSeconds = secondsSinceServiceStart(query.after, query.serviceDate);
 		let best: { trip: TripRecord; boardSeconds: number; alightSeconds: number } | null = null;
@@ -175,10 +199,18 @@ export class GtfsTimetable implements TimetablePort {
 
 		await this.stopTimesLoad;
 
-		const stillMissing = tripIds.filter((tripId) => !this.loadedTripIds.has(tripId));
+		if (this.queuedTripIds.size > 0) {
+			if (!this.stopTimesLoad) {
+				this.stopTimesLoad = this.flushStopTimesQueue().finally(() => {
+					this.stopTimesLoad = null;
+				});
+			}
 
-		if (stillMissing.length > 0) {
-			await this.ensureStopTimes(stillMissing);
+			await this.stopTimesLoad;
+		}
+
+		for (const tripId of tripIds) {
+			this.loadedTripIds.add(tripId);
 		}
 	}
 
@@ -209,6 +241,8 @@ export class GtfsTimetable implements TimetablePort {
 }
 
 export class EmptyTimetable implements TimetablePort {
+	readonly source = 'empty' as const;
+
 	async prepare(_routeIds: string[], _serviceDate: Date): Promise<void> {
 		void _routeIds;
 		void _serviceDate;
@@ -280,6 +314,7 @@ async function loadGtfsIndex(directory: string): Promise<GtfsIndex> {
 	const routeIdsByShortName = new Map<string, string[]>();
 	const stopIdsByExactName = new Map<string, string[]>();
 	const stopIdsByNormalizedName = new Map<string, string[]>();
+	const stopNameById = new Map<string, string>();
 	const tripsByRouteId = new Map<string, TripRecord[]>();
 	const calendarByServiceId = new Map<string, GtfsCalendarWindow>();
 	const calendarDateExceptions = new Map<string, string>();
@@ -304,6 +339,7 @@ async function loadGtfsIndex(directory: string): Promise<GtfsIndex> {
 
 		pushMapValue(stopIdsByExactName, row.stop_name.trim(), row.stop_id);
 		pushMapValue(stopIdsByNormalizedName, normalizeStopName(row.stop_name), row.stop_id);
+		stopNameById.set(row.stop_id, row.stop_name.trim());
 
 		const latitude = Number.parseFloat(row.stop_lat ?? '');
 		const longitude = Number.parseFloat(row.stop_lon ?? '');
@@ -358,6 +394,7 @@ async function loadGtfsIndex(directory: string): Promise<GtfsIndex> {
 		routeIdsByShortName,
 		stopIdsByExactName,
 		stopIdsByNormalizedName,
+		stopNameById,
 		tripsByRouteId,
 		calendarByServiceId,
 		calendarDateExceptions,
@@ -367,11 +404,21 @@ async function loadGtfsIndex(directory: string): Promise<GtfsIndex> {
 
 function resolveRouteIds(index: GtfsIndex, candidateRouteId: string): string[] {
 	const shortName = extractRouteShortName(candidateRouteId);
+	const matched: string[] = [];
 
 	if (shortName) {
-		const matched = index.routeIdsByShortName.get(shortName);
+		const seen = new Set<string>();
 
-		if (matched && matched.length > 0) {
+		for (const key of routeShortNameKeys(shortName)) {
+			for (const routeId of index.routeIdsByShortName.get(key) ?? []) {
+				if (!seen.has(routeId)) {
+					seen.add(routeId);
+					matched.push(routeId);
+				}
+			}
+		}
+
+		if (matched.length > 0) {
 			return matched;
 		}
 	}
@@ -385,27 +432,35 @@ function resolveRouteIds(index: GtfsIndex, candidateRouteId: string): string[] {
 
 function matchStopIds(index: GtfsIndex, stopName: string): string[] {
 	const trimmed = stopName.trim();
-	const exact = index.stopIdsByExactName.get(trimmed);
+	const hits: string[] = [];
+	const seen = new Set<string>();
 
-	if (exact && exact.length > 0) {
-		return exact;
+	const add = (stopIds: string[] | undefined) => {
+		for (const stopId of stopIds ?? []) {
+			if (!seen.has(stopId)) {
+				seen.add(stopId);
+				hits.push(stopId);
+			}
+		}
+	};
+
+	for (const lookup of uniqueStopNameLookups(trimmed)) {
+		add(index.stopIdsByExactName.get(lookup));
 	}
 
-	const normalized = index.stopIdsByNormalizedName.get(normalizeStopName(trimmed));
+	add(index.stopIdsByNormalizedName.get(normalizeStopName(trimmed)));
 
-	if (normalized && normalized.length > 0) {
-		return normalized;
+	if (hits.length > 0) {
+		return hits;
 	}
-
-	const prefixHits: string[] = [];
 
 	for (const [gtfsName, stopIds] of index.stopIdsByExactName) {
 		if (isStopNameMatch(trimmed, gtfsName)) {
-			prefixHits.push(...stopIds);
+			add(stopIds);
 		}
 	}
 
-	return prefixHits;
+	return hits;
 }
 
 function collectActiveTrips(index: GtfsIndex, routeIds: string[], serviceDate: Date): TripRecord[] {

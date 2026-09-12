@@ -75,6 +75,7 @@ function stubClient(
 
 class RecordingTimetable implements TimetablePort {
 	readonly queriedRouteIds: string[] = [];
+	readonly source = 'csv' as const;
 
 	constructor(private readonly inner: GtfsTimetable) {}
 

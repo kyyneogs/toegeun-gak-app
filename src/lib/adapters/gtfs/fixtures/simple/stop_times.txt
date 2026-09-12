@@ -17,4 +17,6 @@ trip_id,arrival_time,departure_time,stop_id,stop_sequence
 5002_A,18:40:00,18:40:00,STOP_G,2
 2_A,18:20:00,18:20:00,STOP_P,1
 2_A,18:50:00,18:50:00,STOP_G,2
+8_A,18:20:00,18:20:00,STOP_MS,1
+8_A,18:40:00,18:40:00,STOP_JS,2
 WRONG_A,18:05:00,18:05:00,STOP_P,1

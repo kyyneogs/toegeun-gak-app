@@ -47,11 +47,16 @@ export class KakaoScheduledRouteProvider implements RouteProvider {
 	}
 
 	async findRoutes(request: RouteRequest): Promise<TransitRoute[]> {
+		const startedAt = Date.now();
+		const kakaoStartedAt = Date.now();
 		const cached = await this.loadTopology(request);
+		const kakaoMs = Date.now() - kakaoStartedAt;
 
 		if (!cached || cached.topologies.length === 0) {
 			return [];
 		}
+
+		const prepareStartedAt = Date.now();
 
 		if (this.timetable.prepare) {
 			await this.timetable.prepare(
@@ -60,8 +65,17 @@ export class KakaoScheduledRouteProvider implements RouteProvider {
 			);
 		}
 
+		const prepareMs = Date.now() - prepareStartedAt;
+		const walkStartedAt = Date.now();
+		const topologies = await Promise.all(
+			cached.topologies.map((topology) =>
+				attachAccessWalks(topology, request.origin, request.destination, this.timetable)
+			)
+		);
+		const walkMs = Date.now() - walkStartedAt;
+		const recalculateStartedAt = Date.now();
 		const recalculated = await Promise.all(
-			cached.topologies.map((topology, routeIndex) =>
+			topologies.map((topology, routeIndex) =>
 				recalculateRoute(
 					topology,
 					request.departureAt,
@@ -71,6 +85,7 @@ export class KakaoScheduledRouteProvider implements RouteProvider {
 				)
 			)
 		);
+		const recalculateMs = Date.now() - recalculateStartedAt;
 
 		const routes = recalculated.flatMap((route, index) => {
 			const materialized = materializeOptimizedRoute(route, request.departureAt, `gtfs_${index}`);
@@ -84,7 +99,17 @@ export class KakaoScheduledRouteProvider implements RouteProvider {
 			);
 		}
 
+		const headwayStartedAt = Date.now();
 		await attachHeadwayLoss(routes, request.departureAt, this.timetable);
+		console.info('Recommend GTFS timings', {
+			source: this.timetable.source ?? 'unknown',
+			kakaoMs,
+			prepareMs,
+			walkMs,
+			recalculateMs,
+			headwayMs: Date.now() - headwayStartedAt,
+			totalMs: Date.now() - startedAt
+		});
 		return routes;
 	}
 
@@ -144,12 +169,6 @@ export class KakaoScheduledRouteProvider implements RouteProvider {
 			return null;
 		}
 
-		const topologiesWithWalks = await Promise.all(
-			topologies.map((topology) =>
-				attachAccessWalks(topology, request.origin, request.destination, this.timetable)
-			)
-		);
-
 		const liveTemplate = mapKakaoRouteToLiveTemplate(
 			payload,
 			request.origin.name,
@@ -164,7 +183,7 @@ export class KakaoScheduledRouteProvider implements RouteProvider {
 				})
 			: null;
 
-		return { topologies: topologiesWithWalks, liveRoute };
+		return { topologies, liveRoute };
 	}
 }
 

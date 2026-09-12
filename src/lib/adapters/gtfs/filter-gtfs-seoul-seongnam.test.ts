@@ -25,8 +25,9 @@ describe('filterGtfsToSeoulAndSeongnam', () => {
 
 		expect(routes).toContain('146');
 		expect(routes).toContain('2호선');
+		expect(routes).toContain('8호선');
 		expect(routes).not.toContain('WRONG');
-		expect(result.routes).toBe(4);
+		expect(result.routes).toBe(5);
 		expect(agency).toBe('');
 	});
 });

@@ -4,8 +4,22 @@ export function extractRouteShortName(routeName: string): string {
 
 	return afterColon
 		.replace(/^서울\s*/u, '')
+		.replace(/^수도권\s*/u, '')
+		.replace(/^지하철\s*/u, '')
 		.replace(/번$/u, '')
 		.replace(/\s+/g, '');
+}
+
+export function routeShortNamesOverlap(kakaoRouteName: string, gtfsRouteName: string): boolean {
+	const kakao = extractRouteShortName(kakaoRouteName);
+	const gtfs = extractRouteShortName(gtfsRouteName);
+
+	if (!kakao || !gtfs) {
+		return false;
+	}
+
+	const kakaoKeys = new Set(routeShortNameKeys(kakao));
+	return routeShortNameKeys(gtfs).some((key) => kakaoKeys.has(key));
 }
 
 const BUS_LETTER_VARIANT = /^(\d+)[A-Za-z]$/;
@@ -33,6 +47,17 @@ export function normalizeStopName(stopName: string): string {
 		.replace(/역$/u, '');
 }
 
+export function uniqueStopNameLookups(stopName: string): string[] {
+	const trimmed = stopName.trim();
+	const compacted = trimmed.replace(/\s+/g, '');
+	const normalized = normalizeStopName(trimmed);
+	const withStation = normalized ? `${normalized}역` : '';
+
+	return [
+		...new Set([trimmed, compacted, normalized, withStation].filter((value) => value !== ''))
+	];
+}
+
 export function isStopNameMatch(kakaoName: string, gtfsName: string): boolean {
 	const kakao = kakaoName.trim();
 	const gtfs = gtfsName.trim();
@@ -56,13 +81,5 @@ export function isStopNameMatch(kakaoName: string, gtfsName: string): boolean {
 		return true;
 	}
 
-	if (kakaoNormalized.length < 2 || gtfsNormalized.length < 2) {
-		return false;
-	}
-
-	return (
-		gtfsNormalized.startsWith(kakaoNormalized) ||
-		kakaoNormalized.startsWith(gtfsNormalized) ||
-		gtfsNormalized.endsWith(kakaoNormalized)
-	);
+	return kakaoNormalized.length >= 2 && gtfsNormalized.endsWith(kakaoNormalized);
 }

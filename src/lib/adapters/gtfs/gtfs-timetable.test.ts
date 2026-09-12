@@ -58,6 +58,42 @@ describe('GtfsTimetable.findNextTrip', () => {
 		expect(formatClock(result!.alightTime)).toBe('18:50');
 	});
 
+	it('boards a subway even when a bus stop reuses the Kakao station name', async () => {
+		const timetable = new GtfsTimetable(FIXTURE_DIR);
+		const result = await timetable.findNextTrip({
+			routeId: '8호선',
+			boardStopName: '모란역',
+			alightStopName: '잠실역',
+			after: combineLocalDateAndClock('18:06', DAY),
+			serviceDate: DAY
+		});
+
+		expect(result?.tripId).toBe('8_A');
+		expect(formatClock(result!.boardTime)).toBe('18:20');
+		expect(formatClock(result!.alightTime)).toBe('18:40');
+	});
+
+	it('finds Seoul line 8 from 모란역 to 잠실역 in the corridor slice', async () => {
+		const timetable = tryCreateGtfsTimetable(GTFS_SEOUL_SEONGNAM_DIR);
+
+		if (!timetable) {
+			return;
+		}
+
+		const startedAt = Date.now();
+		const result = await timetable.findNextTrip({
+			routeId: '8호선',
+			boardStopName: '모란역',
+			alightStopName: '잠실역',
+			after: combineLocalDateAndClock('18:00', DAY),
+			serviceDate: DAY
+		});
+
+		expect(result).not.toBeNull();
+		expect(result!.alightTime.getTime()).toBeGreaterThan(result!.boardTime.getTime());
+		expect(Date.now() - startedAt).toBeLessThan(8_000);
+	});
+
 	it('converts GTFS clocks past 24:00 onto the service date', async () => {
 		const timetable = new GtfsTimetable(FIXTURE_DIR);
 		const result = await timetable.findNextTrip({

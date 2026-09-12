@@ -34,6 +34,10 @@ class SelectingTimetable implements TimetablePort {
 
 	constructor(private readonly gtfsDir: string) {}
 
+	get source() {
+		return this.inner?.source;
+	}
+
 	async prepare(routeIds: string[], serviceDate: Date): Promise<void> {
 		const timetable = await this.resolve();
 		await timetable.prepare?.(routeIds, serviceDate);

@@ -1,7 +1,11 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadGtfsSliceFromDirectory } from '$lib/adapters/gtfs/load-gtfs-slice';
-import { SqlGtfsTimetable } from '$lib/adapters/gtfs/sql-gtfs-timetable';
+import {
+	resetSqlGtfsQueryInvocations,
+	SqlGtfsTimetable,
+	sqlGtfsQueryInvocations
+} from '$lib/adapters/gtfs/sql-gtfs-timetable';
 import { queryOne, resetDatabaseForTests } from '$lib/server/db';
 import { combineLocalDateAndClock, formatClock } from '$lib/utils/time';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -64,6 +68,21 @@ describe('SqlGtfsTimetable.findNextTrip', () => {
 		expect(formatClock(result!.alightTime)).toBe('18:50');
 	});
 
+	it('boards a subway even when a bus stop reuses the Kakao station name', async () => {
+		const timetable = new SqlGtfsTimetable();
+		const result = await timetable.findNextTrip({
+			routeId: '8호선',
+			boardStopName: '모란역',
+			alightStopName: '잠실역',
+			after: combineLocalDateAndClock('18:06', DAY),
+			serviceDate: DAY
+		});
+
+		expect(result?.tripId).toBe('8_A');
+		expect(formatClock(result!.boardTime)).toBe('18:20');
+		expect(formatClock(result!.alightTime)).toBe('18:40');
+	});
+
 	it('applies calendar_dates removals over calendar.txt', async () => {
 		const timetable = new SqlGtfsTimetable();
 		const result = await timetable.findNextTrip({
@@ -82,6 +101,23 @@ describe('SqlGtfsTimetable.findNextTrip', () => {
 		const points = await timetable.findStopCoordinates('판교역');
 
 		expect(points).toEqual([{ latitude: 37.394, longitude: 127.111 }]);
+	});
+
+	it('serves findNextTrip from memory after prepare', async () => {
+		const timetable = new SqlGtfsTimetable();
+		await timetable.prepare(['8호선'], DAY);
+		resetSqlGtfsQueryInvocations();
+
+		const result = await timetable.findNextTrip({
+			routeId: '8호선',
+			boardStopName: '모란역',
+			alightStopName: '잠실역',
+			after: combineLocalDateAndClock('18:06', DAY),
+			serviceDate: DAY
+		});
+
+		expect(result?.tripId).toBe('8_A');
+		expect(sqlGtfsQueryInvocations()).toBe(0);
 	});
 });
 

@@ -2,3 +2,6 @@ stop_id,stop_name,stop_lat,stop_lon
 STOP_J,정류장,37.39,127.11
 STOP_P,판교역,37.394,127.111
 STOP_G,강남역,37.497,127.027
+STOP_MB,모란역,37.432,127.129
+STOP_MS,모란,37.433,127.13
+STOP_JS,잠실,37.513,127.1
