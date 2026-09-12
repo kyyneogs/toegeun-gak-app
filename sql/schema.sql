@@ -9,7 +9,8 @@ DROP TABLE IF EXISTS users CASCADE;
 
 CREATE TABLE users (
 	id UUID PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
-	email TEXT NOT NULL UNIQUE,
+	email TEXT UNIQUE,
+	auth_provider TEXT NOT NULL DEFAULT 'email',
 	nickname TEXT NOT NULL,
 	ranking_opt_in BOOLEAN NOT NULL DEFAULT FALSE,
 	standup_lead_minutes INTEGER NOT NULL DEFAULT 5,
@@ -69,13 +70,16 @@ SET search_path = public
 AS $$
 DECLARE
 	chosen text;
+	user_email text;
+	user_provider text;
 BEGIN
 	chosen := COALESCE(
 		NULLIF(btrim(NEW.raw_user_meta_data ->> 'nickname'), ''),
 		NULLIF(btrim(NEW.raw_user_meta_data ->> 'full_name'), ''),
 		NULLIF(btrim(NEW.raw_user_meta_data ->> 'name'), ''),
 		NULLIF(btrim(NEW.raw_user_meta_data ->> 'preferred_username'), ''),
-		split_part(COALESCE(NEW.email, '퇴근러'), '@', 1)
+		NULLIF(split_part(COALESCE(NEW.email, ''), '@', 1), ''),
+		'퇴근러'
 	);
 	chosen := left(chosen, 12);
 
@@ -83,8 +87,17 @@ BEGIN
 		chosen := '퇴근러';
 	END IF;
 
-	INSERT INTO public.users (id, email, nickname, ranking_opt_in, standup_lead_minutes, created_at)
-	VALUES (NEW.id, COALESCE(NEW.email, ''), chosen, FALSE, 5, now())
+	user_email := NULLIF(btrim(COALESCE(NEW.email, '')), '');
+	user_provider := COALESCE(NEW.raw_app_meta_data ->> 'provider', 'email');
+
+	IF user_provider NOT IN ('email', 'google') THEN
+		user_provider := 'email';
+	END IF;
+
+	INSERT INTO public.users (
+		id, email, auth_provider, nickname, ranking_opt_in, standup_lead_minutes, created_at
+	)
+	VALUES (NEW.id, user_email, user_provider, chosen, FALSE, 5, now())
 	ON CONFLICT (id) DO NOTHING;
 
 	RETURN NEW;

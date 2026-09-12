@@ -57,9 +57,21 @@ describe('auth and commits', () => {
 		};
 		const created = await ensureAppUser(authUser as never);
 		expect(created.nickname).toBe('오쓰러');
+		expect(created.authProvider).toBe('email');
 		const again = await ensureAppUser({ ...authUser, email: 'oauth+alias@b.com' } as never);
 		expect(again.email).toBe('oauth+alias@b.com');
 		expect(again.id).toBe(created.id);
+	});
+
+	it('allows oauth users without an email', async () => {
+		const created = await ensureAppUser({
+			id: '22222222-2222-4222-8222-222222222222',
+			identities: [{ provider: 'google' }],
+			user_metadata: { nickname: '각러' }
+		} as never);
+		expect(created.email).toBeNull();
+		expect(created.authProvider).toBe('google');
+		expect(created.nickname).toBe('각러');
 	});
 
 	it('stores a commit from the server snapshot, not client times', async () => {

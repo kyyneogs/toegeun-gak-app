@@ -5,10 +5,9 @@ import {
 	loginPathWithReturn,
 	safeAuthReturnPath
 } from '$lib/domain/auth/return-path';
-import { ERROR_CODES, ERROR_USER_MESSAGES } from '$lib/constants/errors';
+import { ERROR_USER_MESSAGES } from '$lib/constants/errors';
 import { ensureAppUser } from '$lib/server/auth';
 import { createSupabaseServerClient } from '$lib/server/supabase';
-import { AppError } from '$lib/domain/errors';
 
 export async function GET({ url, cookies }) {
 	const next = safeAuthReturnPath(url.searchParams.get('next'));
@@ -33,12 +32,9 @@ export async function GET({ url, cookies }) {
 	try {
 		await ensureAppUser(data.user);
 	} catch (cause) {
+		console.error('OAuth profile ensure failed', cause);
 		await supabase.auth.signOut();
-		const message =
-			cause instanceof AppError && cause.code === ERROR_CODES.AUTH_EMAIL_REQUIRED
-				? ERROR_USER_MESSAGES.AUTH_EMAIL_REQUIRED
-				: ERROR_USER_MESSAGES.AUTH_INVALID;
-		throw redirect(303, loginPathWithReason(next, message));
+		throw redirect(303, loginPathWithReason(next, ERROR_USER_MESSAGES.AUTH_INVALID));
 	}
 
 	if (next === AUTH_RESET_PATH) {

@@ -1,6 +1,8 @@
 import type { RouteCriterion } from '$lib/domain/recommendation/criteria';
 import { formatSavedDuration } from '$lib/domain/commit/saved-time';
 import { DEFAULT_STANDUP_LEAD_MINUTES } from '$lib/constants/persist';
+import { accountIdentityCopy } from '$lib/domain/auth/provider';
+import type { SessionUser } from '$lib/domain/auth/user';
 
 export const DEFAULT_DEPARTURE_WINDOW_MINUTES = 60;
 export const DEFAULT_DEPARTURE_FROM = '18:00';
@@ -61,7 +63,6 @@ export const LOGIN_TITLE = '로그인';
 export const REGISTER_TITLE = '회원가입';
 export const LOGIN_CTA = '로그인할게요';
 export const REGISTER_CTA = '가입할게요';
-export const OAUTH_KAKAO_CTA = '카카오로 시작하기';
 export const OAUTH_GOOGLE_CTA = 'Google로 시작하기';
 export const OAUTH_DIVIDER = '또는 이메일로';
 export const REGISTER_CHECK_EMAIL = '인증 메일을 보냈어요. 받은편지함을 확인해 주세요.';
@@ -91,6 +92,8 @@ export const PUSH_LEAD_HELPER = `자리에서 일어나기 몇 분 전에 알려
 export const PUSH_LEAD_AT_STANDUP_LABEL = '일어날 때';
 export const PUSH_LEAD_BEFORE_SUFFIX = '분 전';
 export const ACCOUNT_SECTION_LABEL = '계정';
+export const ACCOUNT_GOOGLE_LABEL = 'Google 계정';
+export const ACCOUNT_EMAIL_LABEL = '이메일 계정';
 export const RESULT_LOADING_COPY = '퇴근각을 계산하고 있어요.';
 export const RESULT_LOADING_STEM = '퇴근각을 계산하고 있어';
 export const HEADWAY_DELAY_SUPPORT = '집에 늦게 도착해요.';
@@ -116,6 +119,13 @@ export const GREETING_MORNING = '좋은 아침이에요';
 export const GREETING_DAY = '오늘도 퇴근각이에요';
 export const GREETING_EVENING = '이제 퇴근할 시간이에요';
 export const GREETING_NIGHT = '오늘 하루 수고했어요';
+
+export function accountIdentityLabel(user: Pick<SessionUser, 'email' | 'authProvider'>): string {
+	return accountIdentityCopy(user.email, user.authProvider, {
+		google: ACCOUNT_GOOGLE_LABEL,
+		email: ACCOUNT_EMAIL_LABEL
+	});
+}
 
 export function greetingCopy(now = new Date()): string {
 	const hour = now.getHours();

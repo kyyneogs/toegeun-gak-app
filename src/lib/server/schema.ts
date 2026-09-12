@@ -5,7 +5,8 @@ import { DEFAULT_STANDUP_LEAD_MINUTES } from '$lib/constants/persist';
 export const APP_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS users (
 	id UUID PRIMARY KEY,
-	email TEXT NOT NULL UNIQUE,
+	email TEXT UNIQUE,
+	auth_provider TEXT NOT NULL DEFAULT 'email',
 	nickname TEXT NOT NULL,
 	ranking_opt_in BOOLEAN NOT NULL DEFAULT FALSE,
 	standup_lead_minutes INTEGER NOT NULL DEFAULT ${DEFAULT_STANDUP_LEAD_MINUTES},

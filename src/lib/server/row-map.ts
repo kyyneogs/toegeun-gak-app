@@ -1,10 +1,12 @@
 import { clampStandupLeadMinutes } from '$lib/constants/persist';
+import type { AuthProvider } from '$lib/domain/auth/provider';
 import type { StoredCommit, StoredPushSubscription, StoredUser } from '$lib/server/store-types';
 
 export function mapUser(row: Record<string, unknown>): StoredUser {
 	return {
 		id: String(row.id),
-		email: String(row.email),
+		email: nullableEmail(row.email),
+		authProvider: asAuthProvider(row.auth_provider),
 		nickname: String(row.nickname),
 		rankingOptIn: asBoolean(row.ranking_opt_in),
 		standupLeadMinutes: clampStandupLeadMinutes(row.standup_lead_minutes),
@@ -36,6 +38,23 @@ export function mapPushSubscription(row: Record<string, unknown>): StoredPushSub
 		p256dh: String(row.p256dh),
 		auth: String(row.auth)
 	};
+}
+
+function nullableEmail(value: unknown): string | null {
+	if (value === null || value === undefined) {
+		return null;
+	}
+
+	const email = String(value).trim();
+	return email.length > 0 ? email : null;
+}
+
+function asAuthProvider(value: unknown): AuthProvider {
+	if (value === 'google' || value === 'email') {
+		return value;
+	}
+
+	return 'email';
 }
 
 function asBoolean(value: unknown): boolean {

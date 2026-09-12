@@ -5,6 +5,7 @@
 	import { resolve } from '$app/paths';
 	import {
 		ACCOUNT_SECTION_LABEL,
+		accountIdentityLabel,
 		LOGIN_TITLE,
 		LOGOUT_CTA,
 		NICKNAME_LABEL,
@@ -66,7 +67,7 @@
 <section class="field-block">
 	<p class="section-label">{ACCOUNT_SECTION_LABEL}</p>
 	{#if sessionStore.user}
-		<p class="helper">{sessionStore.user.email}</p>
+		<p class="helper">{accountIdentityLabel(sessionStore.user)}</p>
 		<label class="field-block">
 			<span class="section-label">{NICKNAME_LABEL}</span>
 			<input class="text-input" bind:value={sessionStore.user.nickname} />

@@ -3,7 +3,7 @@ export const AUTH_NICKNAME_MAX_LENGTH = 12;
 export const AUTH_CALLBACK_PATH = '/auth/callback';
 export const AUTH_RESET_PATH = '/auth/reset';
 
-export const AUTH_OAUTH_PROVIDERS = ['google', 'kakao'] as const;
+export const AUTH_OAUTH_PROVIDERS = ['google'] as const;
 
 export type AuthOAuthProvider = (typeof AUTH_OAUTH_PROVIDERS)[number];
 

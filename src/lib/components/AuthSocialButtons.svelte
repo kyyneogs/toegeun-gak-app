@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { OAUTH_DIVIDER, OAUTH_GOOGLE_CTA, OAUTH_KAKAO_CTA } from '$lib/constants/recommendation';
+	import { OAUTH_DIVIDER, OAUTH_GOOGLE_CTA } from '$lib/constants/recommendation';
 	import type { AuthReturnPath } from '$lib/domain/auth/return-path';
 	import { sessionStore } from '$lib/stores/session.svelte';
 
@@ -7,13 +7,6 @@
 </script>
 
 <div class="oauth">
-	<button
-		class="ghost-button oauth-button"
-		type="button"
-		onclick={() => sessionStore.startOAuth('kakao', next)}
-	>
-		{OAUTH_KAKAO_CTA}
-	</button>
 	<button
 		class="ghost-button oauth-button"
 		type="button"

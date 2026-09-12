@@ -22,7 +22,8 @@ describe('auth credentials', () => {
 		expect(AUTH_PASSWORD_MIN_LENGTH).toBe(8);
 		expect(isValidNickname('퇴근러')).toBe(true);
 		expect(isValidNickname('x'.repeat(AUTH_NICKNAME_MAX_LENGTH + 1))).toBe(false);
-		expect(isAuthOAuthProvider('kakao')).toBe(true);
+		expect(isAuthOAuthProvider('kakao')).toBe(false);
+		expect(isAuthOAuthProvider('google')).toBe(true);
 		expect(isAuthOAuthProvider('naver')).toBe(false);
 	});
 });

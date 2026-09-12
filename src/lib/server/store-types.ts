@@ -1,6 +1,7 @@
 export interface StoredUser {
 	id: string;
-	email: string;
+	email: string | null;
+	authProvider: 'email' | 'google';
 	nickname: string;
 	rankingOptIn: boolean;
 	standupLeadMinutes: number;

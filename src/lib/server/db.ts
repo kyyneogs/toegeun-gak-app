@@ -183,19 +183,25 @@ DROP TABLE IF EXISTS users CASCADE;
 
 async function dropLegacyAuthTablesIfNeeded(client: DatabaseClient): Promise<void> {
 	try {
-		const passwordColumn = await client.query<{ column_name: string }>(
-			`SELECT column_name
+		const columns = await client.query<{ column_name: string; is_nullable: string }>(
+			`SELECT column_name, is_nullable
 			 FROM information_schema.columns
 			 WHERE table_schema = 'public'
 			   AND table_name = 'users'
-			   AND column_name = 'password_hash'`
+			   AND column_name IN ('password_hash', 'email', 'auth_provider')`
 		);
+		const byName = new Map(columns.map((row) => [row.column_name, row]));
+		const emailColumn = byName.get('email');
+		const needsRebuild =
+			byName.has('password_hash') ||
+			!byName.has('auth_provider') ||
+			emailColumn?.is_nullable === 'NO';
 
-		if (passwordColumn.length === 0) {
+		if (!needsRebuild) {
 			return;
 		}
 
-		console.warn('Dropping legacy password/session user tables for Supabase Auth');
+		console.warn('Dropping legacy user tables for nullable OAuth email profiles');
 		await client.exec(DROP_LEGACY_AUTH_SQL);
 	} catch (cause) {
 		console.error('Auth schema compatibility check failed', cause);

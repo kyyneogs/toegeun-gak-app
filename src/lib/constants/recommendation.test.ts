@@ -1,4 +1,5 @@
 import {
+	accountIdentityLabel,
 	HEADWAY_LOSS_TITLE,
 	HOME_CTA_LABEL,
 	STAND_UP_BOARD_LABEL,
@@ -11,6 +12,10 @@ import {
 import { describe, expect, it } from 'vitest';
 
 describe('recommendation copy', () => {
+	it('labels oauth accounts when email is missing', () => {
+		expect(accountIdentityLabel({ email: null, authProvider: 'google' })).toBe('Google 계정');
+	});
+
 	it('uses 해요체 for standup, home CTA, and loss title', () => {
 		expect(STAND_UP_WALK_LABEL).toBe('이때 일어나면 돼요');
 		expect(STAND_UP_BOARD_LABEL).toBe('이때 타면 돼요');

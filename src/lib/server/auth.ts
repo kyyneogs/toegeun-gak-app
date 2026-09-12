@@ -5,6 +5,7 @@ import { clampStandupLeadMinutes, DEFAULT_STANDUP_LEAD_MINUTES } from '$lib/cons
 import type { SessionUser } from '$lib/domain/auth/user';
 import { isValidEmail, isValidNickname, normalizeEmail } from '$lib/domain/auth/credentials';
 import { nicknameFromAuthMetadata } from '$lib/domain/auth/nickname';
+import { authProviderFromIdentities } from '$lib/domain/auth/provider';
 import { AppError } from '$lib/domain/errors';
 import { isUniqueViolation, query, queryOne } from '$lib/server/db';
 import { mapUser } from '$lib/server/row-map';
@@ -18,6 +19,7 @@ export function toPublicUser(user: StoredUser): PublicUser {
 	return {
 		id: user.id,
 		email: user.email,
+		authProvider: user.authProvider,
 		nickname: user.nickname,
 		rankingOptIn: user.rankingOptIn,
 		standupLeadMinutes: user.standupLeadMinutes
@@ -36,6 +38,7 @@ export async function insertTestUser(input: {
 	const user: StoredUser = {
 		id: input.id ?? crypto.randomUUID(),
 		email: normalizeEmail(input.email),
+		authProvider: 'email',
 		nickname: input.nickname.trim(),
 		rankingOptIn: false,
 		standupLeadMinutes: DEFAULT_STANDUP_LEAD_MINUTES,
@@ -45,11 +48,12 @@ export async function insertTestUser(input: {
 	try {
 		await query(
 			`INSERT INTO users (
-				id, email, nickname, ranking_opt_in, standup_lead_minutes, created_at
-			) VALUES ($1, $2, $3, $4, $5, $6)`,
+				id, email, auth_provider, nickname, ranking_opt_in, standup_lead_minutes, created_at
+			) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
 			[
 				user.id,
 				user.email,
+				user.authProvider,
 				user.nickname,
 				user.rankingOptIn,
 				user.standupLeadMinutes,
@@ -68,19 +72,19 @@ export async function insertTestUser(input: {
 }
 
 export async function ensureAppUser(authUser: User): Promise<PublicUser> {
-	const email = authUser.email ? normalizeEmail(authUser.email) : '';
-
-	if (!isValidEmail(email)) {
-		throw new AppError(ERROR_CODES.AUTH_EMAIL_REQUIRED);
-	}
-
+	const email = emailFromAuthUser(authUser.email);
+	const authProvider = authProviderFromIdentities(authUser.identities);
 	const existing = await queryOne('SELECT * FROM users WHERE id = $1', [authUser.id]);
-	const nickname = nicknameFromAuthMetadata(email, asStringRecord(authUser.user_metadata));
+	const nickname = nicknameFromAuthMetadata(
+		email ?? undefined,
+		asStringRecord(authUser.user_metadata)
+	);
 
 	if (!existing) {
 		const created: StoredUser = {
 			id: authUser.id,
 			email,
+			authProvider,
 			nickname,
 			rankingOptIn: false,
 			standupLeadMinutes: DEFAULT_STANDUP_LEAD_MINUTES,
@@ -90,11 +94,12 @@ export async function ensureAppUser(authUser: User): Promise<PublicUser> {
 		try {
 			await query(
 				`INSERT INTO users (
-					id, email, nickname, ranking_opt_in, standup_lead_minutes, created_at
-				) VALUES ($1, $2, $3, $4, $5, $6)`,
+					id, email, auth_provider, nickname, ranking_opt_in, standup_lead_minutes, created_at
+				) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
 				[
 					created.id,
 					created.email,
+					created.authProvider,
 					created.nickname,
 					created.rankingOptIn,
 					created.standupLeadMinutes,
@@ -119,10 +124,16 @@ export async function ensureAppUser(authUser: User): Promise<PublicUser> {
 	}
 
 	const stored = mapUser(existing);
+	const nextEmail = email ?? stored.email;
+	const nextProvider = authProvider !== 'email' ? authProvider : stored.authProvider;
 
-	if (stored.email !== email) {
-		await query('UPDATE users SET email = $1 WHERE id = $2', [email, stored.id]);
-		return toPublicUser({ ...stored, email });
+	if (stored.email !== nextEmail || stored.authProvider !== nextProvider) {
+		await query('UPDATE users SET email = $1, auth_provider = $2 WHERE id = $3', [
+			nextEmail,
+			nextProvider,
+			stored.id
+		]);
+		return toPublicUser({ ...stored, email: nextEmail, authProvider: nextProvider });
 	}
 
 	return toPublicUser(stored);
@@ -211,6 +222,7 @@ export async function updateUserProfile(
 	return {
 		id: user.id,
 		email: user.email,
+		authProvider: user.authProvider,
 		nickname,
 		rankingOptIn,
 		standupLeadMinutes
@@ -233,6 +245,15 @@ export function appErrorFromSupabaseAuth(message: string): AppError {
 	}
 
 	return new AppError(ERROR_CODES.AUTH_INVALID);
+}
+
+function emailFromAuthUser(email: string | undefined): string | null {
+	if (!email) {
+		return null;
+	}
+
+	const normalized = normalizeEmail(email);
+	return isValidEmail(normalized) ? normalized : null;
 }
 
 function hasOAuthIdentity(user: User): boolean {
