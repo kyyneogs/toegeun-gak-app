@@ -1,6 +1,12 @@
+import { parseStandupJobRoute } from '$lib/domain/notify/standup-route';
 import { clampStandupLeadMinutes } from '$lib/constants/persist';
 import type { AuthProvider } from '$lib/domain/auth/provider';
-import type { StoredCommit, StoredPushSubscription, StoredUser } from '$lib/server/store-types';
+import type {
+	StoredCommit,
+	StoredPushSubscription,
+	StoredStandupJob,
+	StoredUser
+} from '$lib/server/store-types';
 
 export function mapUser(row: Record<string, unknown>): StoredUser {
 	return {
@@ -28,6 +34,18 @@ export function mapCommit(row: Record<string, unknown>): StoredCommit {
 		naiveArrivalAt: toIsoText(row.naive_arrival_at),
 		savedSeconds: Number(row.saved_seconds),
 		criterion: String(row.criterion)
+	};
+}
+
+export function mapStandupJob(row: Record<string, unknown>): StoredStandupJob {
+	return {
+		id: String(row.id),
+		userId: String(row.user_id),
+		fireAt: toIsoText(row.fire_at),
+		title: String(row.title),
+		body: String(row.body),
+		sentAt: row.sent_at == null ? null : toIsoText(row.sent_at),
+		route: parseStandupJobRoute(row.route)
 	};
 }
 

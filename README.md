@@ -12,7 +12,7 @@
 - 장소 검색: Kakao Maps JavaScript SDK
 - 경로: Kakao REST `publictraffic` (서버 전용 키)
 - 시각표: `DATABASE_URL`이 있으면 Supabase `gtfs_*`만 씁니다. 키가 없을 때만 로컬 `GTFS_DIR` CSV / PGlite
-- 알림: 웹 푸시(VAPID). 로컬 Node는 `setInterval`, Vercel은 Cron
+- 알림: 웹 푸시(VAPID). 로컬 Node는 `setInterval`. Vercel Hobby Cron은 하루 1회라, 제시간은 Supabase `pg_cron`이 1분마다 `/api/cron/standup`을 두드리는 쪽을 권장합니다.
 
 API 키는 저장소에 넣지 않습니다. REST 키는 브라우저에 노출하지 않습니다. 브라우저는 GTFS를 받지 않습니다.
 
@@ -31,21 +31,23 @@ npm run dev
 
 카카오 콘솔의 JavaScript SDK 도메인에 개발 주소와 배포 주소를 등록하세요. `http://` 또는 `https://`를 포함한 호스트:포트가 필요합니다. 예: `http://localhost:5174`. Vercel 프로젝트 `toegeun-gak-app`(팀 noname-8398)은 `https://toegeun-gak-app.vercel.app`과 미리보기 호스트(`https://toegeun-gak-app-git-cursor-gtfs-csv-schema-s-a9b2cd-noname-8398.vercel.app` 등)를 각각 넣습니다. 와일드카드가 안 되면 URL을 각각 넣습니다.
 
+로컬에서 Google 로그인이 Vercel로 끝나면, Supabase **Authentication > URL Configuration > Redirect URLs**에 `http://localhost:5174/auth/callback`과 `http://127.0.0.1:5174/auth/callback`이 없는 겁니다. Site URL은 배포 주소로 두어도 됩니다. 허용 목록에 없는 `redirectTo`는 Site URL(Vercel)로 떨어집니다.
+
 ## 환경 변수
 
-| 이름                       | 위치     | 역할                                                                                         |
-| -------------------------- | -------- | -------------------------------------------------------------------------------------------- |
-| `PUBLIC_KAKAO_JS_KEY`      | 브라우저 | 장소 검색. 없으면 Mock 장소를 씁니다.                                                        |
-| `KAKAO_REST_API_KEY`       | 서버만   | 대중교통 경로. `PUBLIC_` 접두사 금지. 없으면 Mock 경로를 씁니다.                             |
-| `ANTHROPIC_API_KEY`        | 서버만   | Claude AI 추천. `PUBLIC_` 접두사 금지. 없으면 AI 칩은 실패 안내만 보여 줍니다.              |
-| `GTFS_DIR`                 | 로컬만   | 압축 푼 GTFS 폴더. 비우면 `./data/gtfs-seoul-seongnam`. **Vercel에는 넣지 마세요.**          |
-| `DATABASE_URL`             | 서버만   | Postgres. 앱은 트랜잭션 풀러 `:6543`. COPY 적재는 세션 `:5432`. Vercel 필수. `PUBLIC_` 금지. |
-| `PUBLIC_SUPABASE_URL`      | 브라우저 | Auth 프로젝트 URL. `https://xxxx.supabase.co`. 로그인·가입·OAuth에 필요합니다.               |
-| `PUBLIC_SUPABASE_ANON_KEY` | 브라우저 | Auth anon/publishable 키. `service_role` 금지.                                               |
-| `VAPID_PUBLIC_KEY`         | 서버만   | 웹 푸시 공개키. 클라이언트는 `/api/push/vapid`로만 받습니다.                                 |
-| `VAPID_PRIVATE_KEY`        | 서버만   | 웹 푸시 비밀키. `PUBLIC_` 금지.                                                              |
-| `VAPID_SUBJECT`            | 서버만   | 웹 푸시 `mailto:` 또는 `https:` 연락처.                                                      |
-| `CRON_SECRET`              | 서버만   | Vercel Cron이 `Authorization: Bearer`로 보냅니다. 기동 시 `setInterval` 푸시는 끕니다.       |
+| 이름                       | 위치     | 역할                                                                                                            |
+| -------------------------- | -------- | --------------------------------------------------------------------------------------------------------------- |
+| `PUBLIC_KAKAO_JS_KEY`      | 브라우저 | 장소 검색. 없으면 Mock 장소를 씁니다.                                                                           |
+| `KAKAO_REST_API_KEY`       | 서버만   | 대중교통 경로. `PUBLIC_` 접두사 금지. 없으면 Mock 경로를 씁니다.                                                |
+| `ANTHROPIC_API_KEY`        | 서버만   | Claude AI 추천. `PUBLIC_` 접두사 금지. 없으면 AI 칩은 실패 안내만 보여 줍니다.                                  |
+| `GTFS_DIR`                 | 로컬만   | 압축 푼 GTFS 폴더. 비우면 `./data/gtfs-seoul-seongnam`. **Vercel에는 넣지 마세요.**                             |
+| `DATABASE_URL`             | 서버만   | Postgres. 앱은 트랜잭션 풀러 `:6543`. COPY 적재는 세션 `:5432`. Vercel 필수. `PUBLIC_` 금지.                    |
+| `PUBLIC_SUPABASE_URL`      | 브라우저 | Auth 프로젝트 URL. `https://xxxx.supabase.co`. 로그인·가입·OAuth에 필요합니다.                                  |
+| `PUBLIC_SUPABASE_ANON_KEY` | 브라우저 | Auth anon/publishable 키. `service_role` 금지.                                                                  |
+| `VAPID_PUBLIC_KEY`         | 서버만   | 웹 푸시 공개키. 클라이언트는 `/api/push/vapid`로만 받습니다. 배포 Env에 세 값이 모두 있어야 기기 구독이 됩니다. |
+| `VAPID_PRIVATE_KEY`        | 서버만   | 웹 푸시 비밀키. `PUBLIC_` 금지.                                                                                 |
+| `VAPID_SUBJECT`            | 서버만   | 웹 푸시 `mailto:` 또는 `https:` 연락처.                                                                         |
+| `CRON_SECRET`              | 서버만   | Cron이 `Authorization: Bearer`로 보냅니다. 기동 시 `setInterval` 푸시는 끕니다.                                 |
 
 상대 경로는 개발 서버를 켠 폴더 기준입니다. 안 읽히면 절대 경로를 쓰세요.
 
@@ -64,7 +66,11 @@ npm run gtfs:load-slice
 
 zip·원본 피드는 git과 Vercel 함수 디스크에 올리지 마세요.
 
-`vercel.json` Cron은 **매일 23:00 UTC**(한국 시간 다음날 08:00)에 `GET /api/cron/standup`을 호출합니다. Hobby는 하루 한 번만 허용해서 1분 간격은 쓰지 않습니다. 헤더는 `Authorization: Bearer ${CRON_SECRET}`입니다.
+`vercel.json` Cron은 **매일 23:00 UTC**(한국 시간 다음날 08:00)에 `GET /api/cron/standup`을 호출합니다. Hobby는 하루 한 번만 허용해서 퇴근 시각 제시간 발송은 이 Cron만으로는 부족합니다. 헤더는 `Authorization: Bearer ${CRON_SECRET}`입니다.
+
+제시간 발송(권장): Supabase Dashboard에서 `pg_cron`과 `pg_net`(또는 `http`)을 켠 뒤, Vault에 `CRON_SECRET`과 프로덕션 URL을 넣고 1분마다 위 API를 `GET`합니다. **시크릿은 git에 넣지 않습니다.** 확장이 안 켜지면 대안은 Vercel Pro에서 `vercel.json`을 `* * * * *`로 바꾸는 것입니다. 일일 Cron은 백업으로 남겨 둡니다. `sent_at`이 있으면 두 번째 호출은 보내지 않습니다.
+
+Vercel Env에 `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`가 있는지 확인하세요. 키가 없거나 알림 권한이 없으면 서버 잡은 남아도 이 기기 푸시는 등록되지 않습니다.
 
 카카오 경로 검색은 8초, GTFS 시각 맞추기는 12초, AI 추천은 8초로 **단계마다** 끊습니다. `/api/recommend`의 `maxDuration`은 두 경로 단계 합(20초)입니다. Vercel Hobby는 함수 10초 한도가 있어서, 그 플랜이면 Pro로 올리거나 단계가 잘릴 수 있습니다.
 

@@ -2,8 +2,18 @@ import {
 	accountIdentityLabel,
 	HEADWAY_LOSS_TITLE,
 	HOME_CTA_LABEL,
+	PUSH_DEVICE_UNAVAILABLE,
 	STAND_UP_BOARD_LABEL,
 	STAND_UP_WALK_LABEL,
+	STANDUP_CANCEL_ARIA,
+	STANDUP_CANCEL_HELPER,
+	STANDUP_EXISTING_TITLE,
+	STANDUP_KEEP_CTA,
+	STANDUP_PAGE_TITLE,
+	STANDUP_REPLACE_CTA,
+	STANDUP_ROUTE_MISSING,
+	STANDUP_SCHEDULED_EMPTY,
+	STANDUP_SCHEDULED_LABEL,
 	homeOriginCopy,
 	greetingCopy,
 	calculateLoadingCopy,
@@ -22,6 +32,19 @@ describe('recommendation copy', () => {
 		expect(STAND_UP_BOARD_LABEL).toBe('이때 타면 돼요');
 		expect(HEADWAY_LOSS_TITLE).toBe('1분만 늦으면요');
 		expect(HOME_CTA_LABEL).toBe('퇴근각 볼게요');
+	});
+
+	it('names scheduled standup list and cancel in 해요체', () => {
+		expect(STANDUP_SCHEDULED_LABEL).toBe('맞춰 둔 알림');
+		expect(STANDUP_SCHEDULED_EMPTY).toBe('맞춰 둔 알림이 없어요.');
+		expect(STANDUP_PAGE_TITLE).toBe('알림');
+		expect(STANDUP_CANCEL_ARIA).toBe('알림 지우기');
+		expect(STANDUP_CANCEL_HELPER).toBe('이 탭을 닫거나 새로고침해야 기기 타이머도 꺼져요.');
+		expect(STANDUP_EXISTING_TITLE).toBe('이미 맞춰 둔 알림이 있어요');
+		expect(STANDUP_REPLACE_CTA).toBe('이전 알림을 지우고 이걸로 맞출게요');
+		expect(STANDUP_KEEP_CTA).toBe('그대로 두고 하나 더 맞출게요');
+		expect(PUSH_DEVICE_UNAVAILABLE).toBe('알림은 예약했지만 이 기기 푸시는 못 받았어요.');
+		expect(STANDUP_ROUTE_MISSING).toBe('이 알림에는 저장된 경로가 없어요.');
 	});
 
 	it('builds origin and arrival lines without repeating the hero', () => {

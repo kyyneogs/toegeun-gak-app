@@ -5,7 +5,8 @@ import {
 	isValidNickname,
 	isValidPassword,
 	isAuthOAuthProvider,
-	normalizeEmail
+	normalizeEmail,
+	authCallbackUrl
 } from '$lib/domain/auth/credentials';
 import { describe, expect, it } from 'vitest';
 
@@ -25,5 +26,10 @@ describe('auth credentials', () => {
 		expect(isAuthOAuthProvider('kakao')).toBe(false);
 		expect(isAuthOAuthProvider('google')).toBe(true);
 		expect(isAuthOAuthProvider('naver')).toBe(false);
+	});
+
+	it('builds a callback URL without a query string', () => {
+		expect(authCallbackUrl('http://localhost:5174')).toBe('http://localhost:5174/auth/callback');
+		expect(authCallbackUrl('http://localhost:5174/')).toBe('http://localhost:5174/auth/callback');
 	});
 });

@@ -11,6 +11,10 @@
 		COMMIT_DONE_LABEL,
 		COMMIT_NEED_ACCOUNT,
 		PUSH_IOS_HINT,
+		STANDUP_EXISTING_TITLE,
+		STANDUP_KEEP_CTA,
+		STANDUP_REPLACE_CTA,
+		STANDUP_VIEW_LINK,
 		CRITERION_SECTION_LABEL,
 		AI_PICK_LOADING_COPY,
 		OVERTIME_SECTION_LABEL,
@@ -64,7 +68,7 @@
 	}
 
 	function commitRoute(): void {
-		void sessionStore.commitCurrentRecommendation();
+		void sessionStore.requestCommitCurrentRecommendation();
 	}
 </script>
 
@@ -164,9 +168,36 @@
 		</section>
 
 		<a class="primary-button link-button" href={resolve('/result/route')}>{RESULT_ROUTE_CTA}</a>
-		{#if committed}
+		{#if sessionStore.commitPrompt === 'existing'}
+			<p class="helper predicted-copy">{STANDUP_EXISTING_TITLE}</p>
+			<ul class="existing-jobs">
+				{#each sessionStore.standupJobs as job (job.id)}
+					<li>
+						{#if job.route}
+							{job.route.originName} → {job.route.destinationName} · {job.body}
+						{:else}
+							{job.body}
+						{/if}
+					</li>
+				{/each}
+			</ul>
+			<button
+				class="primary-button"
+				type="button"
+				onclick={() => sessionStore.commitReplacingExisting()}>{STANDUP_REPLACE_CTA}</button
+			>
+			<button
+				class="ghost-button"
+				type="button"
+				onclick={() => sessionStore.commitKeepingExisting()}>{STANDUP_KEEP_CTA}</button
+			>
+		{:else if committed}
 			<p class="helper predicted-copy">{COMMIT_DONE_LABEL}</p>
+			{#if sessionStore.pushDeviceWarning}
+				<p class="helper predicted-copy">{sessionStore.pushDeviceWarning}</p>
+			{/if}
 			<p class="helper predicted-copy">{PUSH_IOS_HINT}</p>
+			<a class="nav-link view-alerts" href={resolve('/notifications')}>{STANDUP_VIEW_LINK}</a>
 		{:else if !sessionStore.user}
 			<p class="helper predicted-copy">{COMMIT_NEED_ACCOUNT}</p>
 			<a class="ghost-button" href={resolve('/login')}>{COMMIT_CTA_LABEL}</a>
@@ -289,5 +320,20 @@
 
 	.chip:disabled {
 		opacity: 0.6;
+	}
+
+	.existing-jobs {
+		margin: 0 0 12px;
+		padding: 0;
+		list-style: none;
+		color: var(--color-secondary-label);
+		font-size: 13px;
+		text-align: center;
+	}
+
+	.view-alerts {
+		display: flex;
+		justify-content: center;
+		margin: 8px 0 0;
 	}
 </style>

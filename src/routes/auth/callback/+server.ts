@@ -1,16 +1,13 @@
 import { redirect } from '@sveltejs/kit';
 import { AUTH_RESET_PATH } from '$lib/domain/auth/credentials';
-import {
-	loginPathWithReason,
-	loginPathWithReturn,
-	safeAuthReturnPath
-} from '$lib/domain/auth/return-path';
+import { loginPathWithReason, loginPathWithReturn } from '$lib/domain/auth/return-path';
 import { ERROR_USER_MESSAGES } from '$lib/constants/errors';
 import { ensureAppUser } from '$lib/server/auth';
+import { takeAuthReturnPath } from '$lib/server/auth-next-cookie';
 import { createSupabaseServerClient } from '$lib/server/supabase';
 
 export async function GET({ url, cookies }) {
-	const next = safeAuthReturnPath(url.searchParams.get('next'));
+	const next = takeAuthReturnPath(cookies, url.searchParams.get('next'));
 	const code = url.searchParams.get('code');
 	const authError = url.searchParams.get('error_description') ?? url.searchParams.get('error');
 	const supabase = createSupabaseServerClient(cookies);

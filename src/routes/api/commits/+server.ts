@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { clockMinutesInSeoul } from '$lib/domain/commit/saved-time';
+import { parseStandupJobRoute } from '$lib/domain/notify/standup-route';
 import { jsonError } from '$lib/server/json-error';
 import { requireUser } from '$lib/server/auth';
 import { createCommit } from '$lib/server/commits';
@@ -25,7 +26,8 @@ export async function POST({ request, cookies }) {
 				userId: user.id,
 				fireAt,
 				title: '퇴근각',
-				body: standupBody(commit.departureAt)
+				body: standupBody(commit.departureAt),
+				route: parseStandupJobRoute(body.route)
 			});
 		}
 

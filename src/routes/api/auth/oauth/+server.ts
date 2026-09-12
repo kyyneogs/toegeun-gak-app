@@ -1,8 +1,9 @@
 import { json } from '@sveltejs/kit';
 import { ERROR_CODES } from '$lib/constants/errors';
-import { AUTH_CALLBACK_PATH, isAuthOAuthProvider } from '$lib/domain/auth/credentials';
+import { authCallbackUrl, isAuthOAuthProvider } from '$lib/domain/auth/credentials';
 import { safeAuthReturnPath } from '$lib/domain/auth/return-path';
 import { AppError } from '$lib/domain/errors';
+import { rememberAuthReturnPath } from '$lib/server/auth-next-cookie';
 import { jsonError } from '$lib/server/json-error';
 import { requireSupabase } from '$lib/server/supabase';
 
@@ -17,7 +18,8 @@ export async function POST({ request, cookies, url }) {
 		}
 
 		const next = safeAuthReturnPath(typeof record.next === 'string' ? record.next : '/');
-		const redirectTo = `${url.origin}${AUTH_CALLBACK_PATH}?next=${encodeURIComponent(next)}`;
+		rememberAuthReturnPath(cookies, next, url.protocol === 'https:');
+		const redirectTo = authCallbackUrl(url.origin);
 		const { data, error } = await supabase.auth.signInWithOAuth({
 			provider,
 			options: {

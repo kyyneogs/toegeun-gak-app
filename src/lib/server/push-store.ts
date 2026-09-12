@@ -1,6 +1,9 @@
-import { query } from '$lib/server/db';
-import { mapPushSubscription } from '$lib/server/row-map';
-import type { StoredPushSubscription } from '$lib/server/store-types';
+import type { StandupJobRoute } from '$lib/domain/notify/standup-route';
+import { ERROR_CODES } from '$lib/constants/errors';
+import { AppError } from '$lib/domain/errors';
+import { query, queryOne } from '$lib/server/db';
+import { mapPushSubscription, mapStandupJob } from '$lib/server/row-map';
+import type { StoredPushSubscription, StoredStandupJob } from '$lib/server/store-types';
 import { createId } from '$lib/utils/id';
 import { toIso } from '$lib/utils/time';
 
@@ -25,11 +28,19 @@ export async function scheduleStandupJob(input: {
 	fireAt: Date;
 	title: string;
 	body: string;
+	route?: StandupJobRoute | null;
 }): Promise<void> {
 	await query(
-		`INSERT INTO standup_jobs (id, user_id, fire_at, title, body, sent_at)
-		VALUES ($1, $2, $3, $4, $5, NULL)`,
-		[createId('standup'), input.userId, toIso(input.fireAt), input.title, input.body]
+		`INSERT INTO standup_jobs (id, user_id, fire_at, title, body, sent_at, route)
+		VALUES ($1, $2, $3, $4, $5, NULL, $6)`,
+		[
+			createId('standup'),
+			input.userId,
+			toIso(input.fireAt),
+			input.title,
+			input.body,
+			input.route ? JSON.stringify(input.route) : null
+		]
 	);
 }
 
@@ -57,6 +68,53 @@ export async function dueStandupJobs(now = new Date()): Promise<
 
 export async function markStandupSent(id: string, now = new Date()): Promise<void> {
 	await query('UPDATE standup_jobs SET sent_at = $1 WHERE id = $2', [toIso(now), id]);
+}
+
+export async function pendingStandupJobsForUser(userId: string): Promise<StoredStandupJob[]> {
+	const rows = await query(
+		`SELECT id, user_id, fire_at, title, body, sent_at, route FROM standup_jobs
+		WHERE user_id = $1 AND sent_at IS NULL
+		ORDER BY fire_at`,
+		[userId]
+	);
+	return rows.map(mapStandupJob);
+}
+
+export async function pendingStandupJobForUser(
+	userId: string,
+	jobId: string
+): Promise<StoredStandupJob | null> {
+	if (!jobId.trim()) {
+		return null;
+	}
+
+	const row = await queryOne(
+		`SELECT id, user_id, fire_at, title, body, sent_at, route FROM standup_jobs
+		WHERE user_id = $1 AND id = $2 AND sent_at IS NULL`,
+		[userId, jobId]
+	);
+	return row ? mapStandupJob(row) : null;
+}
+
+export async function cancelStandupJob(userId: string, jobId: string): Promise<void> {
+	if (!jobId.trim()) {
+		throw new AppError(ERROR_CODES.INVALID_REQUEST);
+	}
+
+	const deleted = await queryOne(
+		`DELETE FROM standup_jobs
+		WHERE user_id = $1 AND id = $2 AND sent_at IS NULL
+		RETURNING id`,
+		[userId, jobId]
+	);
+
+	if (!deleted) {
+		throw new AppError(ERROR_CODES.INVALID_REQUEST);
+	}
+}
+
+export async function cancelAllPendingStandupJobs(userId: string): Promise<void> {
+	await query('DELETE FROM standup_jobs WHERE user_id = $1 AND sent_at IS NULL', [userId]);
 }
 
 export async function deletePushSubscription(userId: string, endpoint: string): Promise<void> {

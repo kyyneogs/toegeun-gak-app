@@ -4,6 +4,7 @@ export const AUTH_RETURN_PATHS = [
 	'/',
 	'/result',
 	'/settings',
+	'/notifications',
 	'/record',
 	'/ranking',
 	AUTH_RESET_PATH

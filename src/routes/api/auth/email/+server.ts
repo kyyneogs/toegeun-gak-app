@@ -1,7 +1,13 @@
 import { json } from '@sveltejs/kit';
 import { ERROR_CODES } from '$lib/constants/errors';
-import { AUTH_CALLBACK_PATH, isValidEmail, normalizeEmail } from '$lib/domain/auth/credentials';
+import {
+	AUTH_RESET_PATH,
+	authCallbackUrl,
+	isValidEmail,
+	normalizeEmail
+} from '$lib/domain/auth/credentials';
 import { AppError } from '$lib/domain/errors';
+import { rememberAuthReturnPath } from '$lib/server/auth-next-cookie';
 import { jsonError } from '$lib/server/json-error';
 import { requireSupabase } from '$lib/server/supabase';
 
@@ -16,7 +22,7 @@ export async function POST({ request, cookies, url }) {
 		}
 
 		const type = record.type === 'signup' ? 'signup' : 'recovery';
-		const redirectTo = `${url.origin}${AUTH_CALLBACK_PATH}`;
+		const redirectTo = authCallbackUrl(url.origin);
 
 		if (type === 'signup') {
 			const { error } = await supabase.auth.resend({
@@ -32,8 +38,9 @@ export async function POST({ request, cookies, url }) {
 			return json({ ok: true });
 		}
 
+		rememberAuthReturnPath(cookies, AUTH_RESET_PATH, url.protocol === 'https:');
 		const { error } = await supabase.auth.resetPasswordForEmail(email, {
-			redirectTo: `${url.origin}${AUTH_CALLBACK_PATH}?next=${encodeURIComponent('/auth/reset')}`
+			redirectTo
 		});
 
 		if (error) {

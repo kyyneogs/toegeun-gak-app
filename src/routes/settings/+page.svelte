@@ -19,9 +19,10 @@
 		REGISTER_TITLE,
 		SETTINGS_DEPARTURE_LABEL,
 		SETTINGS_HEADING,
+		STANDUP_PAGE_TITLE,
 		standupLeadOptionLabel
 	} from '$lib/constants/recommendation';
-	import { STANDUP_LEAD_MINUTE_OPTIONS } from '$lib/constants/persist';
+	import { STANDUP_LEAD_MINUTE_OPTIONS, type StandupLeadMinutes } from '$lib/constants/persist';
 	import type { Place } from '$lib/domain/place/place';
 	import { sessionStore } from '$lib/stores/session.svelte';
 	import { settingsStore } from '$lib/stores/settings.svelte';
@@ -47,12 +48,13 @@
 		void sessionStore.saveProfile({ nickname: sessionStore.user.nickname });
 	}
 
-	function saveStandupLead(minutes: number): void {
-		void settingsStore.saveStandupLeadMinutes(minutes);
-
+	function saveLeadMinutes(minutes: StandupLeadMinutes): void {
 		if (sessionStore.user) {
 			void sessionStore.saveProfile({ standupLeadMinutes: minutes });
+			return;
 		}
+
+		void settingsStore.saveStandupLeadMinutes(minutes);
 	}
 </script>
 
@@ -85,6 +87,7 @@
 		<a class="nav-link" href={resolve('/register')}>{REGISTER_TITLE}</a>
 	{/if}
 	<div class="link-stack">
+		<a class="nav-link" href={resolve('/notifications')}>{STANDUP_PAGE_TITLE}</a>
 		<a class="nav-link" href={resolve('/record')}>{RECORD_TITLE}</a>
 		<a class="nav-link" href={resolve('/ranking')}>{RANKING_TITLE}</a>
 	</div>
@@ -99,13 +102,14 @@
 				class="chip"
 				class:active={settingsStore.standupLeadMinutes === minutes}
 				type="button"
-				onclick={() => saveStandupLead(minutes)}
+				onclick={() => saveLeadMinutes(minutes)}>{standupLeadOptionLabel(minutes)}</button
 			>
-				{standupLeadOptionLabel(minutes)}
-			</button>
 		{/each}
 	</div>
 	<p class="helper">{PUSH_IOS_HINT}</p>
+	{#if sessionStore.errorMessage}
+		<p class="helper">{sessionStore.errorMessage}</p>
+	{/if}
 </section>
 
 <section class="field-block">
@@ -178,7 +182,7 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 8px;
-		margin-top: 12px;
+		margin: 8px 0 12px;
 	}
 
 	.chip {

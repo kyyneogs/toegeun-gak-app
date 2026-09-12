@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { ERROR_CODES } from '$lib/constants/errors';
 import {
-	AUTH_CALLBACK_PATH,
+	authCallbackUrl,
 	isValidEmail,
 	isValidNickname,
 	isValidPassword,
@@ -29,7 +29,7 @@ export async function POST({ request, cookies, url }) {
 			password,
 			options: {
 				data: { nickname },
-				emailRedirectTo: `${url.origin}${AUTH_CALLBACK_PATH}`
+				emailRedirectTo: authCallbackUrl(url.origin)
 			}
 		});
 

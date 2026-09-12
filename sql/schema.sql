@@ -57,7 +57,8 @@ CREATE TABLE standup_jobs (
 	fire_at TIMESTAMPTZ NOT NULL,
 	title TEXT NOT NULL,
 	body TEXT NOT NULL,
-	sent_at TIMESTAMPTZ
+	sent_at TIMESTAMPTZ,
+	route JSONB
 );
 
 CREATE INDEX IF NOT EXISTS standup_jobs_due_idx ON standup_jobs (fire_at);

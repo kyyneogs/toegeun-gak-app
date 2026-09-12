@@ -11,7 +11,7 @@
 ## 다음 작업 시
 
 - 배포 전 [`sql/schema.sql`](../sql/schema.sql)을 SQL 에디터에 적용하고, Dashboard에서 `auth.users`도 비운다.
-- Auth URL: Site URL + Redirect에 `https://toegeun-gak.vercel.app/auth/callback`, 프리뷰, `http://localhost:5174/auth/callback`. Confirm email ON (이메일 가입만).
+- Auth URL: Site URL은 배포 도메인. Redirect URLs에 `https://toegeun-gak.vercel.app/auth/callback`, 프리뷰, `http://localhost:5174/auth/callback`, `http://127.0.0.1:5174/auth/callback`. Confirm email ON (이메일 가입만). localhost가 Redirect에 없으면 Google 후 Site URL(Vercel)로 갑니다.
 - Google 제공자 키. Redirect는 `https://<project>.supabase.co/auth/v1/callback`.
 - 카카오 **로그인**은 쓰지 않는다. 지도 JS키·대중교통 REST는 그대로.
 - Google은 이메일 없이 될 수 있다. Provider에서 **Allow users without an email** ON.

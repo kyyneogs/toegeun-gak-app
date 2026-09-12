@@ -2,6 +2,12 @@ export const AUTH_PASSWORD_MIN_LENGTH = 8;
 export const AUTH_NICKNAME_MAX_LENGTH = 12;
 export const AUTH_CALLBACK_PATH = '/auth/callback';
 export const AUTH_RESET_PATH = '/auth/reset';
+export const AUTH_NEXT_COOKIE = 'tgk_auth_next';
+export const AUTH_NEXT_COOKIE_MAX_AGE_SECONDS = 10 * 60;
+
+export function authCallbackUrl(origin: string): string {
+	return `${origin.replace(/\/$/, '')}${AUTH_CALLBACK_PATH}`;
+}
 
 export const AUTH_OAUTH_PROVIDERS = ['google'] as const;
 

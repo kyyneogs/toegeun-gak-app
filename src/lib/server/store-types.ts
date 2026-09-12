@@ -1,3 +1,5 @@
+import type { StandupJobRoute } from '$lib/domain/notify/standup-route';
+
 export interface StoredUser {
 	id: string;
 	email: string | null;
@@ -28,6 +30,16 @@ export interface StoredPushSubscription {
 	endpoint: string;
 	p256dh: string;
 	auth: string;
+}
+
+export interface StoredStandupJob {
+	id: string;
+	userId: string;
+	fireAt: string;
+	title: string;
+	body: string;
+	sentAt: string | null;
+	route: StandupJobRoute | null;
 }
 
 export interface RecommendationSnapshotRoute {

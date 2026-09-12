@@ -72,6 +72,14 @@ async function armReminder(reminder: StandupReminder): Promise<void> {
 	}, delay);
 }
 
+export function clearStandupReminder(): void {
+	if (typeof window === 'undefined') {
+		return;
+	}
+
+	window.localStorage.removeItem(STORAGE_KEYS.STANDUP_REMINDER);
+}
+
 async function showStandupNotification(reminder: StandupReminder): Promise<void> {
 	if (typeof Notification === 'undefined' || Notification.permission !== 'granted') {
 		return;

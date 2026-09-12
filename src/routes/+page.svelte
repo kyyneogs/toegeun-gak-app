@@ -8,7 +8,8 @@
 		HOME_ARRIVE_BY_LABEL,
 		HOME_CTA_LABEL,
 		HOME_TIME_HELPER,
-		homeOriginCopy
+		homeOriginCopy,
+		STANDUP_PAGE_TITLE
 	} from '$lib/constants/recommendation';
 	import { HOME_STAGGER_MS } from '$lib/constants/motion';
 	import { tripSession } from '$lib/stores/trip-session.svelte';
@@ -44,7 +45,10 @@
 >
 	<header class="nav-row">
 		<h1 class="nav-title">퇴근각</h1>
-		<a class="nav-link" href={resolve('/settings')}>설정</a>
+		<div class="nav-end">
+			<a class="nav-link" href={resolve('/notifications')}>{STANDUP_PAGE_TITLE}</a>
+			<a class="nav-link" href={resolve('/settings')}>설정</a>
+		</div>
 	</header>
 
 	<p class="large-title">오늘 어디로 가시나요?</p>
@@ -196,5 +200,11 @@
 		margin-top: 8px;
 		color: inherit;
 		text-decoration: none;
+	}
+
+	.nav-end {
+		display: flex;
+		align-items: center;
+		gap: 16px;
 	}
 </style>
