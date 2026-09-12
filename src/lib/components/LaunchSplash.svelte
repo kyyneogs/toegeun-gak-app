@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { SPLASH_ENTER_MS, SPLASH_FADE_MS, SPLASH_HOLD_MS } from '$lib/constants/motion';
-	import { greetingCopy } from '$lib/constants/recommendation';
+	import { greetingCopy, WELCOME_READY_MARK } from '$lib/constants/recommendation';
 	import { splashSession } from '$lib/stores/splash.svelte';
 
 	let leaving = $state(false);
@@ -56,7 +56,7 @@
 
 {#if visible}
 	<div class="splash" class:leaving aria-hidden="true">
-		<p class="mark">퇴근각</p>
+		<p class="mark">{WELCOME_READY_MARK}</p>
 		<p class="hello">{hello}</p>
 	</div>
 {/if}
@@ -70,13 +70,13 @@
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		gap: 10px;
+		gap: 12px;
 		background: var(--color-accent);
 		color: var(--color-on-accent);
 	}
 
 	.leaving {
-		animation: splash-fade var(--duration-splash-fade) ease both;
+		animation: splash-fade var(--duration-splash-fade) var(--ease-in) both;
 	}
 
 	.mark {
@@ -84,14 +84,14 @@
 		font-size: 34px;
 		font-weight: 700;
 		letter-spacing: -0.04em;
-		animation: splash-bounce var(--duration-splash) var(--ease-spring) both;
+		animation: splash-bounce var(--duration-splash) var(--ease-bounce) both;
 	}
 
 	.hello {
 		margin: 0;
 		color: var(--color-on-accent-muted);
 		font-size: 17px;
-		animation: greeting-in var(--duration-enter) var(--ease-out) 120ms both;
+		animation: greeting-in var(--duration-greeting) var(--ease-out) var(--delay-greeting) both;
 	}
 
 	@keyframes splash-bounce {

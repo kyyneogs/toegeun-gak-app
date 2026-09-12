@@ -1,4 +1,8 @@
-import { ONBOARDING_READY_HOLD_MS, SPLASH_ENTER_MS, SPLASH_FADE_MS } from '$lib/constants/motion';
+import {
+	ONBOARDING_READY_ENTER_MS,
+	ONBOARDING_READY_FADE_MS,
+	ONBOARDING_READY_HOLD_MS
+} from '$lib/constants/motion';
 
 export function onboardingReadyTimings(reducedMotion: boolean): {
 	fadeAt: number;
@@ -8,8 +12,8 @@ export function onboardingReadyTimings(reducedMotion: boolean): {
 		return { fadeAt: 0, doneAt: 0 };
 	}
 
-	const fadeAt = SPLASH_ENTER_MS + ONBOARDING_READY_HOLD_MS;
-	return { fadeAt, doneAt: fadeAt + SPLASH_FADE_MS };
+	const fadeAt = ONBOARDING_READY_ENTER_MS + ONBOARDING_READY_HOLD_MS;
+	return { fadeAt, doneAt: fadeAt + ONBOARDING_READY_FADE_MS };
 }
 
 export function shouldKeepOnboardingOverlay(

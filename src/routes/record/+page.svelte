@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import BackLink from '$lib/components/BackLink.svelte';
 	import {
 		LOGIN_TITLE,
 		RECORD_EMPTY,
@@ -30,7 +31,7 @@
 </script>
 
 <header class="nav-row">
-	<a class="nav-link" href={resolve('/')}>← 홈</a>
+	<BackLink fallback="/settings" />
 	<h1 class="nav-title">{RECORD_TITLE}</h1>
 	<span></span>
 </header>

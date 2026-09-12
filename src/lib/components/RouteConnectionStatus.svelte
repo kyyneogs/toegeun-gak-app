@@ -122,8 +122,8 @@
 	}
 
 	.ok {
-		background: #34c75924;
-		color: #248a3d;
+		background: var(--color-success-fill);
+		color: var(--color-success);
 	}
 
 	.mock {

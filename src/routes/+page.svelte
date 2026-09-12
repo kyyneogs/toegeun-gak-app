@@ -9,16 +9,15 @@
 		HOME_CTA_LABEL,
 		HOME_TIME_HELPER,
 		homeOriginCopy,
+		greetingCopy,
 		STANDUP_PAGE_TITLE
 	} from '$lib/constants/recommendation';
-	import { HOME_STAGGER_MS } from '$lib/constants/motion';
 	import { tripSession } from '$lib/stores/trip-session.svelte';
 	import { splashSession } from '$lib/stores/splash.svelte';
 	import { settingsStore } from '$lib/stores/settings.svelte';
 	import type { Place } from '$lib/domain/place/place';
 
 	let hydrated = $state(false);
-	const skipEnterStagger = splashSession.finished;
 
 	$effect(() => {
 		if (settingsStore.loaded && !hydrated) {
@@ -37,12 +36,7 @@
 	}
 </script>
 
-<div
-	class="home-stage"
-	class:home-enter={splashSession.finished}
-	class:home-stagger={splashSession.finished && !skipEnterStagger}
-	style="--stagger-step: {HOME_STAGGER_MS}ms"
->
+<div class="home-stage" class:home-enter={splashSession.finished}>
 	<header class="nav-row">
 		<h1 class="nav-title">퇴근각</h1>
 		<div class="nav-end">
@@ -51,6 +45,7 @@
 		</div>
 	</header>
 
+	<p class="greeting">{greetingCopy()}</p>
 	<p class="large-title">오늘 어디로 가시나요?</p>
 
 	<section class="field-block">
@@ -123,48 +118,11 @@
 		opacity: 0;
 	}
 
-	.home-stagger > :global(*) {
-		animation: rise-in var(--duration-enter) var(--ease-out) both;
-	}
-
-	.home-stagger > :global(*:nth-child(1)) {
-		animation-delay: 0ms;
-	}
-
-	.home-stagger > :global(*:nth-child(2)) {
-		animation-delay: calc(1 * var(--stagger-step));
-	}
-
-	.home-stagger > :global(*:nth-child(3)) {
-		animation-delay: calc(2 * var(--stagger-step));
-	}
-
-	.home-stagger > :global(*:nth-child(4)) {
-		animation-delay: calc(3 * var(--stagger-step));
-	}
-
-	.home-stagger > :global(*:nth-child(5)) {
-		animation-delay: calc(4 * var(--stagger-step));
-	}
-
-	.home-stagger > :global(*:nth-child(6)) {
-		animation-delay: calc(5 * var(--stagger-step));
-	}
-
-	.home-stagger > :global(*:nth-child(7)) {
-		animation-delay: calc(6 * var(--stagger-step));
-	}
-
-	.home-stagger > :global(*:nth-child(8)) {
-		animation-delay: calc(7 * var(--stagger-step));
-	}
-
-	.home-stagger > :global(*:nth-child(9)) {
-		animation-delay: calc(8 * var(--stagger-step));
-	}
-
-	.home-stagger > :global(*:nth-child(10)) {
-		animation-delay: calc(9 * var(--stagger-step));
+	.greeting {
+		margin: 8px 0 0;
+		color: var(--color-accent);
+		font-size: 15px;
+		font-weight: 600;
 	}
 
 	.time-row {
@@ -185,13 +143,6 @@
 	.arrive-toggle input {
 		width: 18px;
 		height: 18px;
-	}
-
-	.helper {
-		margin: 8px 0 0;
-		color: var(--color-secondary-label);
-		font-size: 13px;
-		line-height: 1.4;
 	}
 
 	.connection {

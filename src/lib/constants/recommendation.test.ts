@@ -2,6 +2,8 @@ import {
 	accountIdentityLabel,
 	HEADWAY_LOSS_TITLE,
 	HOME_CTA_LABEL,
+	NAV_BACK,
+	COMMIT_LOGIN_CTA,
 	PUSH_DEVICE_UNAVAILABLE,
 	STAND_UP_BOARD_LABEL,
 	STAND_UP_WALK_LABEL,
@@ -32,6 +34,8 @@ describe('recommendation copy', () => {
 		expect(STAND_UP_BOARD_LABEL).toBe('이때 타면 돼요');
 		expect(HEADWAY_LOSS_TITLE).toBe('1분만 늦으면요');
 		expect(HOME_CTA_LABEL).toBe('퇴근각 볼게요');
+		expect(COMMIT_LOGIN_CTA).toBe('로그인하고 맞출게요');
+		expect(NAV_BACK).toBe('뒤로');
 	});
 
 	it('names scheduled standup list and cancel in 해요체', () => {

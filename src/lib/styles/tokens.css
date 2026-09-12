@@ -1,24 +1,26 @@
 :root {
 	color-scheme: light;
-	--color-bg: #f2f2f7;
+	--color-bg: #f2f4f6;
 	--color-card: #ffffff;
-	--color-grouped: #f2f2f7;
-	--color-text: #1c1c1e;
-	--color-label: #8e8e93;
-	--color-secondary-label: #636366;
-	--color-accent: #007aff;
-	--color-accent-pressed: #0066d6;
+	--color-grouped: #f2f4f6;
+	--color-text: #191f28;
+	--color-label: #8b95a1;
+	--color-secondary-label: #4e5968;
+	--color-accent: #3182f6;
+	--color-accent-pressed: #1b64da;
 	--color-on-accent: #ffffff;
 	--color-on-accent-muted: rgb(255 255 255 / 0.82);
-	--color-separator: #c6c6c8;
-	--color-fill: #e5e5ea;
-	--color-fill-strong: #d1d1d6;
-	--color-danger: #ff3b30;
-	--color-success: #34c759;
+	--color-separator: #e5e8eb;
+	--color-fill: #e5e8eb;
+	--color-fill-strong: #d1d6db;
+	--color-danger: #f04452;
+	--color-success: #03b26c;
+	--color-success-fill: rgb(3 178 108 / 0.14);
+	--color-accent-ring: rgb(49 130 246 / 0.16);
 	--color-overlay: rgb(0 0 0 / 0.04);
-	--radius-card: 16px;
-	--radius-control: 12px;
-	--radius-button: 14px;
+	--radius-card: 20px;
+	--radius-control: 16px;
+	--radius-button: 16px;
 	--radius-pill: 999px;
 	--space-1: 4px;
 	--space-2: 8px;
@@ -30,33 +32,47 @@
 	--font-sans:
 		-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', system-ui,
 		sans-serif;
-	--shadow-card: 0 1px 2px rgb(0 0 0 / 0.04);
+	--shadow-card: 0 1px 4px rgb(25 31 40 / 0.04);
 	--hero-size: clamp(56px, 16vw, 80px);
 	--app-max-width: 430px;
 	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-	--ease-spring: cubic-bezier(0.22, 1.15, 0.36, 1);
-	--duration-enter: 480ms;
-	--duration-splash: 640ms;
-	--duration-splash-hold: 1100ms;
-	--duration-splash-fade: 400ms;
-	--duration-page: 320ms;
+	--ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+	--ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+	--ease-spring: var(--ease-bounce);
+	--duration-press: 140ms;
+	--duration-enter: 320ms;
+	--duration-splash: 1000ms;
+	--duration-splash-hold: 2600ms;
+	--duration-splash-fade: 700ms;
+	--duration-greeting: 2400ms;
+	--delay-greeting: 600ms;
+	--duration-page: 280ms;
 	--duration-count: 400ms;
-	--duration-hero-pop: 560ms;
+	--duration-hero-pop: 400ms;
 	--duration-shimmer: 1.4s;
 	--duration-breathe: 1.6s;
+	--duration-check-circle: 350ms;
+	--duration-check-mark: 250ms;
+	--delay-check-mark: 300ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
 	:root {
 		--motion: 0ms;
+		--duration-press: 0ms;
 		--duration-enter: 0ms;
 		--duration-splash: 0ms;
 		--duration-splash-hold: 0ms;
 		--duration-splash-fade: 0ms;
+		--duration-greeting: 0ms;
+		--delay-greeting: 0ms;
 		--duration-page: 0ms;
 		--duration-count: 0ms;
 		--duration-hero-pop: 0ms;
 		--duration-shimmer: 0ms;
 		--duration-breathe: 0ms;
+		--duration-check-circle: 0ms;
+		--duration-check-mark: 0ms;
+		--delay-check-mark: 0ms;
 	}
 }

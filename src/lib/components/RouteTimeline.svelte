@@ -65,7 +65,7 @@
 		margin-top: 6px;
 		border-radius: 50%;
 		background: var(--color-accent);
-		box-shadow: 0 0 0 4px #007aff1a;
+		box-shadow: 0 0 0 4px var(--color-accent-ring);
 	}
 
 	.step:not(:last-child) .rail::after {

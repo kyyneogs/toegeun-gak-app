@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
+	import BackLink from '$lib/components/BackLink.svelte';
 	import AuthSocialButtons from '$lib/components/AuthSocialButtons.svelte';
 	import {
 		EMAIL_LABEL,
@@ -31,7 +32,7 @@
 </script>
 
 <header class="nav-row">
-	<a class="nav-link" href={resolve('/')}>← 홈</a>
+	<BackLink fallback="/settings" />
 	<h1 class="nav-title">{LOGIN_TITLE}</h1>
 	<span></span>
 </header>

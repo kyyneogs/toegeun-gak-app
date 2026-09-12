@@ -73,7 +73,7 @@
 				{#if result.samplePlaceName}
 					· {result.samplePlaceName}
 				{/if}
-				{#if !result.ok && currentOrigin}
+				{#if !compact && !result.ok && currentOrigin}
 					지금 주소는 {currentOrigin}이에요.
 				{/if}
 			{/if}
@@ -124,8 +124,8 @@
 	}
 
 	.ok {
-		background: #34c75924;
-		color: #248a3d;
+		background: var(--color-success-fill);
+		color: var(--color-success);
 	}
 
 	.mock {

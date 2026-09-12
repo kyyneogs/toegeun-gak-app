@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import BackLink from '$lib/components/BackLink.svelte';
 	import AuthSocialButtons from '$lib/components/AuthSocialButtons.svelte';
 	import {
 		AUTH_PENDING_OK,
 		EMAIL_LABEL,
-		LOGIN_TITLE,
 		NICKNAME_LABEL,
 		PASSWORD_LABEL,
 		REGISTER_CHECK_EMAIL,
@@ -43,7 +43,7 @@
 </script>
 
 <header class="nav-row">
-	<a class="nav-link" href={resolve('/login')}>← {LOGIN_TITLE}</a>
+	<BackLink fallback="/login" />
 	<h1 class="nav-title">{REGISTER_TITLE}</h1>
 	<span></span>
 </header>

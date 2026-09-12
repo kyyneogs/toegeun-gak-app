@@ -1,14 +1,16 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import SkeletonBlock from '$lib/components/SkeletonBlock.svelte';
 	import LoadingStatus from '$lib/components/LoadingStatus.svelte';
+	import SkeletonBlock from '$lib/components/SkeletonBlock.svelte';
 	import WaitComparison from '$lib/components/WaitComparison.svelte';
 	import { scheduleRouteCopy } from '$lib/constants/kakao';
+	import SuccessCheck from '$lib/components/SuccessCheck.svelte';
 	import {
 		ARRIVE_BY_RESULT_HELPER,
 		COMMIT_CTA_LABEL,
 		COMMIT_DONE_LABEL,
+		COMMIT_LOGIN_CTA,
 		COMMIT_NEED_ACCOUNT,
 		PUSH_IOS_HINT,
 		STANDUP_EXISTING_TITLE,
@@ -80,7 +82,7 @@
 
 {#if tripSession.status === 'calculating'}
 	<LoadingStatus message={tripSession.loadingCopy()} />
-	<SkeletonBlock lines={4} />
+	<SkeletonBlock />
 {:else if tripSession.status === 'error'}
 	<div class="error-block">
 		<p class="large-title error-title">{RESULT_ERROR_TITLE}</p>
@@ -138,6 +140,54 @@
 			</div>
 		</section>
 
+		<div class="commit-panel">
+			<a class="primary-button link-button" href={resolve('/result/route')}>{RESULT_ROUTE_CTA}</a>
+			{#if sessionStore.commitPrompt === 'existing'}
+				<div class="card conflict">
+					<p class="helper predicted-copy">{STANDUP_EXISTING_TITLE}</p>
+					<ul class="existing-jobs">
+						{#each sessionStore.standupJobs as job (job.id)}
+							<li>
+								{#if job.route}
+									{job.route.originName} → {job.route.destinationName} · {job.body}
+								{:else}
+									{job.body}
+								{/if}
+							</li>
+						{/each}
+					</ul>
+					<button
+						class="primary-button"
+						type="button"
+						onclick={() => sessionStore.commitReplacingExisting()}>{STANDUP_REPLACE_CTA}</button
+					>
+					<button
+						class="ghost-button"
+						type="button"
+						onclick={() => sessionStore.commitKeepingExisting()}>{STANDUP_KEEP_CTA}</button
+					>
+				</div>
+			{:else if committed}
+				<div class="commit-done">
+					<SuccessCheck size={88} />
+					<p class="helper predicted-copy done-copy">{COMMIT_DONE_LABEL}</p>
+					{#if sessionStore.pushDeviceWarning}
+						<p class="helper predicted-copy">{sessionStore.pushDeviceWarning}</p>
+					{/if}
+					<p class="helper predicted-copy">{PUSH_IOS_HINT}</p>
+					<a class="nav-link view-alerts" href={resolve('/notifications')}>{STANDUP_VIEW_LINK}</a>
+				</div>
+			{:else if !sessionStore.user}
+				<p class="helper predicted-copy">{COMMIT_NEED_ACCOUNT}</p>
+				<a class="ghost-button" href={resolve('/login')}>{COMMIT_LOGIN_CTA}</a>
+			{:else}
+				<button class="ghost-button" type="button" onclick={commitRoute}>{COMMIT_CTA_LABEL}</button>
+			{/if}
+			{#if sessionStore.errorMessage}
+				<p class="helper predicted-copy">{sessionStore.errorMessage}</p>
+			{/if}
+		</div>
+
 		<section class="criteria">
 			<p class="section-label">{CRITERION_SECTION_LABEL}</p>
 			<div class="chip-row">
@@ -146,6 +196,7 @@
 						class="chip"
 						class:active={tripSession.selectedCriterion === criterion}
 						type="button"
+						aria-pressed={tripSession.selectedCriterion === criterion}
 						disabled={criterion === 'aiPick' && tripSession.aiStatus === 'loading'}
 						onclick={() => chooseCriterion(criterion)}
 					>
@@ -166,58 +217,10 @@
 				>
 			</div>
 		</section>
-
-		<a class="primary-button link-button" href={resolve('/result/route')}>{RESULT_ROUTE_CTA}</a>
-		{#if sessionStore.commitPrompt === 'existing'}
-			<p class="helper predicted-copy">{STANDUP_EXISTING_TITLE}</p>
-			<ul class="existing-jobs">
-				{#each sessionStore.standupJobs as job (job.id)}
-					<li>
-						{#if job.route}
-							{job.route.originName} → {job.route.destinationName} · {job.body}
-						{:else}
-							{job.body}
-						{/if}
-					</li>
-				{/each}
-			</ul>
-			<button
-				class="primary-button"
-				type="button"
-				onclick={() => sessionStore.commitReplacingExisting()}>{STANDUP_REPLACE_CTA}</button
-			>
-			<button
-				class="ghost-button"
-				type="button"
-				onclick={() => sessionStore.commitKeepingExisting()}>{STANDUP_KEEP_CTA}</button
-			>
-		{:else if committed}
-			<p class="helper predicted-copy">{COMMIT_DONE_LABEL}</p>
-			{#if sessionStore.pushDeviceWarning}
-				<p class="helper predicted-copy">{sessionStore.pushDeviceWarning}</p>
-			{/if}
-			<p class="helper predicted-copy">{PUSH_IOS_HINT}</p>
-			<a class="nav-link view-alerts" href={resolve('/notifications')}>{STANDUP_VIEW_LINK}</a>
-		{:else if !sessionStore.user}
-			<p class="helper predicted-copy">{COMMIT_NEED_ACCOUNT}</p>
-			<a class="ghost-button" href={resolve('/login')}>{COMMIT_CTA_LABEL}</a>
-		{:else}
-			<button class="ghost-button" type="button" onclick={commitRoute}>{COMMIT_CTA_LABEL}</button>
-		{/if}
-		{#if sessionStore.errorMessage}
-			<p class="helper predicted-copy">{sessionStore.errorMessage}</p>
-		{/if}
 	</section>
 {/if}
 
 <style>
-	.helper {
-		margin: 0 0 12px;
-		color: var(--color-secondary-label);
-		font-size: 13px;
-		line-height: 1.4;
-	}
-
 	.hero-label {
 		margin: 10px 0 8px;
 		color: var(--color-text);
@@ -236,7 +239,7 @@
 		line-height: 1;
 		text-align: center;
 		font-variant-numeric: tabular-nums;
-		animation: hero-pop var(--duration-hero-pop) var(--ease-spring) both;
+		animation: hero-pop var(--duration-hero-pop) var(--ease-bounce) both;
 	}
 
 	.hero-arrival {
@@ -283,43 +286,37 @@
 		font-size: 28px;
 	}
 
+	.commit-panel {
+		display: grid;
+		gap: 12px;
+		margin: 16px 0 8px;
+	}
+
+	.conflict {
+		display: grid;
+		gap: 8px;
+		padding: 16px;
+	}
+
+	.commit-done {
+		display: grid;
+		justify-items: center;
+		gap: 4px;
+		padding: 8px 0 4px;
+	}
+
+	.done-copy {
+		margin-top: 12px;
+		animation: rise-in var(--duration-enter) var(--ease-out) var(--delay-check-mark) both;
+	}
+
 	.link-button {
-		margin-top: 8px;
 		text-decoration: none;
-		display: flex;
-		align-items: center;
-		justify-content: center;
 	}
 
 	.criteria,
 	.overtime {
 		margin: 16px 0;
-	}
-
-	.chip-row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-	}
-
-	.chip {
-		min-height: 36px;
-		padding: 0 12px;
-		border: 0.5px solid var(--color-separator);
-		border-radius: var(--radius-pill);
-		background: var(--color-card);
-		color: var(--color-text);
-		font-size: 14px;
-	}
-
-	.chip.active {
-		background: var(--color-accent);
-		border-color: var(--color-accent);
-		color: #fff;
-	}
-
-	.chip:disabled {
-		opacity: 0.6;
 	}
 
 	.existing-jobs {

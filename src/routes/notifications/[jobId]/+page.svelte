@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
+	import BackLink from '$lib/components/BackLink.svelte';
 	import RouteTimeline from '$lib/components/RouteTimeline.svelte';
 	import { scheduleRouteCopy } from '$lib/constants/kakao';
 	import {
@@ -9,7 +10,6 @@
 		ROUTE_PAGE_TITLE,
 		STAND_UP_BOARD_LABEL,
 		STAND_UP_WALK_LABEL,
-		STANDUP_PAGE_TITLE,
 		STANDUP_ROUTE_MISSING,
 		STANDUP_SCHEDULED_LOGIN,
 		resultArrivalCopy
@@ -83,7 +83,7 @@
 </script>
 
 <header class="nav-row">
-	<a class="nav-link" href={resolve('/notifications')}>← {STANDUP_PAGE_TITLE}</a>
+	<BackLink fallback="/notifications" />
 	<h1 class="nav-title">{ROUTE_PAGE_TITLE}</h1>
 	<span></span>
 </header>

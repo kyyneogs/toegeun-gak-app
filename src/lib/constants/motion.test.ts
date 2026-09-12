@@ -1,9 +1,20 @@
 import {
+	MAX_CEREMONY_MS,
+	MIN_SPLASH_MS,
 	ONBOARDING_READY_HOLD_MS,
 	PAGE_TRANSITION_MS,
+	SPLASH_ENTER_MS,
+	SPLASH_FADE_MS,
+	SPLASH_GREETING_DELAY_MS,
+	SPLASH_GREETING_MS,
+	SPLASH_HOLD_MS,
+	SUCCESS_CHECK_DELAY_MS,
+	SUCCESS_CHECK_MS,
+	SUCCESS_CIRCLE_MS,
 	countToward,
 	easeOutCubic,
 	isBackNavigation,
+	navigationDirection,
 	pathDepth
 } from '$lib/constants/motion';
 import { describe, expect, it } from 'vitest';
@@ -36,7 +47,28 @@ describe('isBackNavigation', () => {
 
 	it('treats browser history pop as back', () => {
 		expect(isBackNavigation('/', '/result/route', 'popstate')).toBe(true);
-		expect(PAGE_TRANSITION_MS).toBe(320);
-		expect(ONBOARDING_READY_HOLD_MS).toBe(900);
+		expect(PAGE_TRANSITION_MS).toBe(280);
+		expect(ONBOARDING_READY_HOLD_MS).toBe(240);
+	});
+
+	it('slides same-depth routes forward instead of fading', () => {
+		expect(navigationDirection('/result', '/settings', 'link')).toBe('forward');
+		expect(navigationDirection('/settings', '/login', 'link')).toBe('forward');
+		expect(isBackNavigation('/result', '/settings', 'link')).toBe(false);
+	});
+});
+
+describe('ceremony timing', () => {
+	it('keeps splash greeting on screen for at least four seconds including fade', () => {
+		const splashMs = SPLASH_ENTER_MS + SPLASH_HOLD_MS + SPLASH_FADE_MS;
+		expect(splashMs).toBeGreaterThanOrEqual(MIN_SPLASH_MS);
+		expect(SPLASH_GREETING_DELAY_MS + SPLASH_GREETING_MS).toBeLessThanOrEqual(
+			SPLASH_ENTER_MS + SPLASH_HOLD_MS
+		);
+	});
+
+	it('keeps check drawing under 800ms', () => {
+		expect(SUCCESS_CIRCLE_MS).toBeLessThanOrEqual(MAX_CEREMONY_MS);
+		expect(SUCCESS_CHECK_DELAY_MS + SUCCESS_CHECK_MS).toBeLessThanOrEqual(MAX_CEREMONY_MS);
 	});
 });

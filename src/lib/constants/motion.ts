@@ -1,13 +1,23 @@
-export const SPLASH_ENTER_MS = 640;
-export const SPLASH_HOLD_MS = 1100;
-export const SPLASH_FADE_MS = 400;
-export const ONBOARDING_READY_HOLD_MS = 900;
-export const PAGE_TRANSITION_MS = 320;
+export const SPLASH_ENTER_MS = 1000;
+export const SPLASH_GREETING_DELAY_MS = 600;
+export const SPLASH_GREETING_MS = 2400;
+export const SPLASH_HOLD_MS = 2600;
+export const SPLASH_FADE_MS = 700;
+export const MIN_SPLASH_MS = 4000;
+export const ONBOARDING_READY_ENTER_MS = 280;
+export const ONBOARDING_READY_HOLD_MS = 240;
+export const ONBOARDING_READY_FADE_MS = 280;
+export const PAGE_TRANSITION_MS = 280;
 export const COUNT_UP_MS = 400;
 export const ELLIPSIS_INTERVAL_MS = 400;
-export const HOME_STAGGER_MS = 60;
 export const ELLIPSIS_MAX_DOTS = 3;
 export const SKELETON_LINE_DELAY_MS = 120;
+export const SUCCESS_CIRCLE_MS = 350;
+export const SUCCESS_CHECK_DELAY_MS = 300;
+export const SUCCESS_CHECK_MS = 250;
+export const MAX_CEREMONY_MS = 800;
+
+export type NavigationDirection = 'back' | 'forward';
 
 export function prefersReducedMotion(): boolean {
 	if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -40,9 +50,24 @@ export function isBackNavigation(
 	toPath: string,
 	navigationType: string
 ): boolean {
+	return navigationDirection(fromPath, toPath, navigationType) === 'back';
+}
+
+export function navigationDirection(
+	fromPath: string,
+	toPath: string,
+	navigationType: string
+): NavigationDirection {
 	if (navigationType === 'popstate') {
-		return true;
+		return 'back';
 	}
 
-	return pathDepth(toPath) < pathDepth(fromPath);
+	const fromDepth = pathDepth(fromPath);
+	const toDepth = pathDepth(toPath);
+
+	if (toDepth < fromDepth) {
+		return 'back';
+	}
+
+	return 'forward';
 }

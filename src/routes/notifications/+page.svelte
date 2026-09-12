@@ -1,4 +1,5 @@
 <script lang="ts">
+	import BackLink from '$lib/components/BackLink.svelte';
 	import { resolve } from '$app/paths';
 	import {
 		LOGIN_TITLE,
@@ -23,7 +24,7 @@
 </script>
 
 <header class="nav-row">
-	<a class="nav-link" href={resolve('/')}>← 홈</a>
+	<BackLink fallback="/" />
 	<h1 class="nav-title">{STANDUP_PAGE_TITLE}</h1>
 	<span></span>
 </header>

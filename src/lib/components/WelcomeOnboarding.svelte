@@ -4,7 +4,8 @@
 	import { resolve } from '$app/paths';
 	import { onDestroy } from 'svelte';
 	import PlaceSearchField from '$lib/components/PlaceSearchField.svelte';
-	import { prefersReducedMotion, SPLASH_FADE_MS } from '$lib/constants/motion';
+	import SuccessCheck from '$lib/components/SuccessCheck.svelte';
+	import { PAGE_TRANSITION_MS, prefersReducedMotion } from '$lib/constants/motion';
 	import {
 		HOME_TIME_HELPER,
 		WELCOME_DONE_LABEL,
@@ -18,7 +19,6 @@
 		WELCOME_ORIGIN_PLACEHOLDER,
 		WELCOME_ORIGIN_TITLE,
 		WELCOME_READY_HELPER,
-		WELCOME_READY_MARK,
 		WELCOME_READY_TITLE,
 		WELCOME_SKIP_LABEL,
 		WELCOME_STEP_COPY,
@@ -102,7 +102,7 @@
 		doneTimer = window.setTimeout(() => {
 			afterFade();
 			closeOverlay();
-		}, SPLASH_FADE_MS);
+		}, PAGE_TRANSITION_MS);
 	}
 
 	function playReadyThenClose(): void {
@@ -207,7 +207,7 @@
 		aria-labelledby="welcome-title"
 	>
 		{#if showReady}
-			<p class="ready-mark">{WELCOME_READY_MARK}</p>
+			<SuccessCheck size={72} />
 			<h1 id="welcome-title" class="large-title ready-title">{WELCOME_READY_TITLE}</h1>
 			<p class="ready-helper">{WELCOME_READY_HELPER}</p>
 		{:else}
@@ -288,7 +288,7 @@
 	}
 
 	.leaving {
-		animation: welcome-fade var(--duration-splash-fade) ease both;
+		animation: welcome-fade var(--duration-page) var(--ease-in) both;
 	}
 
 	.step {
@@ -359,19 +359,10 @@
 		text-decoration: none;
 	}
 
-	.ready-mark {
-		margin: 0 0 10px;
-		color: var(--color-accent);
-		font-size: 17px;
-		font-weight: 600;
-		letter-spacing: -0.02em;
-		animation: hero-pop var(--duration-splash) var(--ease-spring) both;
-	}
-
 	.ready-title {
-		margin: 0;
+		margin: 16px 0 0;
 		text-align: center;
-		animation: rise-in var(--duration-enter) var(--ease-out) 80ms both;
+		animation: rise-in var(--duration-enter) var(--ease-out) var(--delay-check-mark) both;
 	}
 
 	.ready-helper {

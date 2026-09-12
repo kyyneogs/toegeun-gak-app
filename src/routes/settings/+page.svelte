@@ -3,6 +3,7 @@
 	import PlaceConnectionStatus from '$lib/components/PlaceConnectionStatus.svelte';
 	import RouteConnectionStatus from '$lib/components/RouteConnectionStatus.svelte';
 	import { resolve } from '$app/paths';
+	import BackLink from '$lib/components/BackLink.svelte';
 	import {
 		ACCOUNT_SECTION_LABEL,
 		accountIdentityLabel,
@@ -59,7 +60,7 @@
 </script>
 
 <header class="nav-row">
-	<a class="nav-link" href={resolve('/')}>← 홈</a>
+	<BackLink fallback="/" />
 	<h1 class="nav-title">설정</h1>
 	<span></span>
 </header>
@@ -179,25 +180,6 @@
 	}
 
 	.chip-row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
 		margin: 8px 0 12px;
-	}
-
-	.chip {
-		min-height: 36px;
-		padding: 0 12px;
-		border: 0.5px solid var(--color-separator);
-		border-radius: var(--radius-pill);
-		background: var(--color-card);
-		color: var(--color-text);
-		font-size: 14px;
-	}
-
-	.chip.active {
-		background: var(--color-accent);
-		border-color: var(--color-accent);
-		color: #fff;
 	}
 </style>

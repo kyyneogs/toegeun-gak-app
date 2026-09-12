@@ -1,4 +1,8 @@
-import { ONBOARDING_READY_HOLD_MS, SPLASH_ENTER_MS, SPLASH_FADE_MS } from '$lib/constants/motion';
+import {
+	ONBOARDING_READY_ENTER_MS,
+	ONBOARDING_READY_FADE_MS,
+	ONBOARDING_READY_HOLD_MS
+} from '$lib/constants/motion';
 import {
 	onboardingReadyTimings,
 	shouldKeepOnboardingOverlay
@@ -8,8 +12,9 @@ import { describe, expect, it } from 'vitest';
 describe('onboardingReadyTimings', () => {
 	it('holds the ready beat then fades before dismissing', () => {
 		const timings = onboardingReadyTimings(false);
-		expect(timings.fadeAt).toBe(SPLASH_ENTER_MS + ONBOARDING_READY_HOLD_MS);
-		expect(timings.doneAt).toBe(timings.fadeAt + SPLASH_FADE_MS);
+		expect(timings.fadeAt).toBe(ONBOARDING_READY_ENTER_MS + ONBOARDING_READY_HOLD_MS);
+		expect(timings.doneAt).toBe(timings.fadeAt + ONBOARDING_READY_FADE_MS);
+		expect(timings.doneAt).toBeLessThanOrEqual(800);
 	});
 
 	it('skips the wait when motion is reduced', () => {

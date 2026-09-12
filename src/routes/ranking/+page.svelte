@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
+	import BackLink from '$lib/components/BackLink.svelte';
 	import { RANKING_EMPTY, RANKING_SAVED_LABEL, RANKING_TITLE } from '$lib/constants/recommendation';
 	import type { RankingEntry } from '$lib/domain/commit/types';
 
@@ -21,7 +21,7 @@
 </script>
 
 <header class="nav-row">
-	<a class="nav-link" href={resolve('/')}>← 홈</a>
+	<BackLink fallback="/settings" />
 	<h1 class="nav-title">{RANKING_TITLE}</h1>
 	<span></span>
 </header>

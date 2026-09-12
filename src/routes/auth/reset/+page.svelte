@@ -1,9 +1,9 @@
 <script lang="ts">
+	import BackLink from '$lib/components/BackLink.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import {
 		EMAIL_LABEL,
-		LOGIN_TITLE,
 		PASSWORD_LABEL,
 		RESET_PASSWORD_CTA,
 		RESET_PASSWORD_SENT,
@@ -34,7 +34,7 @@
 </script>
 
 <header class="nav-row">
-	<a class="nav-link" href={resolve('/login')}>← {LOGIN_TITLE}</a>
+	<BackLink fallback="/login" />
 	<h1 class="nav-title">{RESET_PASSWORD_TITLE}</h1>
 	<span></span>
 </header>
