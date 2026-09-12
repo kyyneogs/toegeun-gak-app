@@ -1,4 +1,10 @@
+import { ERROR_CODES } from '$lib/constants/errors';
 import { RECOMMENDATION_SNAPSHOT_TTL_MS } from '$lib/constants/persist';
+import { AppError } from '$lib/domain/errors';
+import {
+	candidateAtIndex,
+	summariesFromTimedRoutes
+} from '$lib/domain/recommendation/ai-candidates';
 import type { RecommendationResult } from '$lib/domain/recommendation/types';
 import { query, queryOne } from '$lib/server/db';
 import type { RecommendationSnapshotPayload } from '$lib/server/store-types';
@@ -26,8 +32,32 @@ export function snapshotFromResult(
 		naiveArrivalAt: result.naiveArrivalAt,
 		originName,
 		destinationName,
-		routes
+		mode: result.mode,
+		routes,
+		aiCandidates: summariesFromTimedRoutes(result.timedRoutes)
 	};
+}
+
+export function withAiPickRoute(
+	payload: RecommendationSnapshotPayload,
+	index: number
+): RecommendationSnapshotPayload {
+	const candidate = candidateAtIndex(payload.aiCandidates ?? [], index);
+
+	if (!candidate) {
+		throw new AppError(ERROR_CODES.AI_UNAVAILABLE);
+	}
+
+	const routes = [
+		...payload.routes.filter((route) => route.criterion !== 'aiPick'),
+		{
+			criterion: 'aiPick',
+			departureAt: candidate.departureAt,
+			arrivalAt: candidate.arrivalAt
+		}
+	];
+
+	return { ...payload, routes };
 }
 
 export async function saveRecommendationSnapshot(

@@ -1,4 +1,4 @@
-import type { RouteRequest, TransitRoute } from '$lib/domain/route/route';
+import type { RouteRequest, RouteSearchOptions, TransitRoute } from '$lib/domain/route/route';
 import type { RouteProvider } from '$lib/ports/route-provider';
 import { placePairKey, toMinuteStamp } from '$lib/utils/geo';
 
@@ -11,15 +11,18 @@ export class MemoryCachedRouteProvider implements RouteProvider {
 
 	constructor(private readonly inner: RouteProvider) {}
 
-	findRoutes(request: RouteRequest): Promise<TransitRoute[]> {
+	findRoutes(request: RouteRequest, options?: RouteSearchOptions): Promise<TransitRoute[]> {
 		const key = buildRouteCacheKey(request);
 		const existing = this.cache.get(key);
 
 		if (existing) {
+			options?.onProgress?.('searchingRoutes');
+			options?.onProgress?.('routesFound');
+			options?.onProgress?.('timingRoutes');
 			return existing;
 		}
 
-		const pending = this.inner.findRoutes(request).catch((cause) => {
+		const pending = this.inner.findRoutes(request, options).catch((cause) => {
 			this.cache.delete(key);
 			throw cause;
 		});

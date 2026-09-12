@@ -4,6 +4,7 @@ import {
 	mapKakaoRoutesToTopologies
 } from '$lib/adapters/kakao/kakao-transit-mapper';
 import { ERROR_CODES } from '$lib/constants/errors';
+import { ROUTE_SEARCH_TIMEOUT_MS, ROUTE_TIMING_TIMEOUT_MS } from '$lib/constants/persist';
 import {
 	firstTransitSegment,
 	lastTransitSegment,
@@ -20,11 +21,12 @@ import {
 import type { TopologyRoute } from '$lib/domain/optimization/types';
 import { AppError } from '$lib/domain/errors';
 import { materializeRouteTemplate } from '$lib/domain/route/schedule';
-import type { RouteRequest, TransitRoute } from '$lib/domain/route/route';
+import type { RouteRequest, RouteSearchOptions, TransitRoute } from '$lib/domain/route/route';
 import type { RouteProvider } from '$lib/ports/route-provider';
 import type { TimetablePort } from '$lib/ports/timetable-port';
 import { closestPoint, placePairKey, walkingSecondsBetween, type GeoPoint } from '$lib/utils/geo';
 import { fromIso } from '$lib/utils/time';
+import { withTimeout } from '$lib/utils/timeout';
 
 interface CachedTopology {
 	topologies: TopologyRoute[];
@@ -46,29 +48,42 @@ export class KakaoScheduledRouteProvider implements RouteProvider {
 		return topology?.liveRoute ?? null;
 	}
 
-	async findRoutes(request: RouteRequest): Promise<TransitRoute[]> {
+	async findRoutes(request: RouteRequest, options?: RouteSearchOptions): Promise<TransitRoute[]> {
 		const startedAt = Date.now();
 		const kakaoStartedAt = Date.now();
-		const cached = await this.loadTopology(request);
+		options?.onProgress?.('searchingRoutes');
+		const cached = await withTimeout(this.loadTopology(request), ROUTE_SEARCH_TIMEOUT_MS);
 		const kakaoMs = Date.now() - kakaoStartedAt;
 
 		if (!cached || cached.topologies.length === 0) {
 			return [];
 		}
 
+		options?.onProgress?.('routesFound');
+		options?.onProgress?.('timingRoutes');
+
+		return withTimeout(
+			this.timeTopologies(request, cached.topologies, startedAt, kakaoMs),
+			ROUTE_TIMING_TIMEOUT_MS
+		);
+	}
+
+	private async timeTopologies(
+		request: RouteRequest,
+		sourceTopologies: TopologyRoute[],
+		startedAt: number,
+		kakaoMs: number
+	): Promise<TransitRoute[]> {
 		const prepareStartedAt = Date.now();
 
 		if (this.timetable.prepare) {
-			await this.timetable.prepare(
-				collectCandidateRouteIds(cached.topologies),
-				request.departureAt
-			);
+			await this.timetable.prepare(collectCandidateRouteIds(sourceTopologies), request.departureAt);
 		}
 
 		const prepareMs = Date.now() - prepareStartedAt;
 		const walkStartedAt = Date.now();
 		const topologies = await Promise.all(
-			cached.topologies.map((topology) =>
+			sourceTopologies.map((topology) =>
 				attachAccessWalks(topology, request.origin, request.destination, this.timetable)
 			)
 		);

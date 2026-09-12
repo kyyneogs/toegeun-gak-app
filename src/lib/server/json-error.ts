@@ -33,6 +33,8 @@ function statusFor(code: ErrorCode): number {
 			return 409;
 		case ERROR_CODES.AUTH_UNAVAILABLE:
 			return 503;
+		case ERROR_CODES.AI_UNAVAILABLE:
+			return 502;
 		case ERROR_CODES.INVALID_REQUEST:
 			return 400;
 		default:

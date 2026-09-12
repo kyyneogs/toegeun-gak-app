@@ -6,6 +6,7 @@ import {
 	STAND_UP_WALK_LABEL,
 	homeOriginCopy,
 	greetingCopy,
+	calculateLoadingCopy,
 	criterionLabel,
 	resultArrivalCopy
 } from '$lib/constants/recommendation';
@@ -35,6 +36,14 @@ describe('recommendation copy', () => {
 		expect(criterionLabel('shortestDuration')).toBe('짧은 이동');
 		expect(criterionLabel('leastWalking')).toBe('적은 도보');
 		expect(criterionLabel('fewestTransfers')).toBe('적은 환승');
+		expect(criterionLabel('aiPick')).toBe('AI 추천');
+	});
+
+	it('names loading stages in 해요체', () => {
+		expect(calculateLoadingCopy('searchingRoutes')).toBe('경로를 검색 중이에요');
+		expect(calculateLoadingCopy('routesFound')).toBe('경로를 찾았어요');
+		expect(calculateLoadingCopy('timingRoutes')).toBe('최적 경로를 탐색 중이에요');
+		expect(calculateLoadingCopy('aiPicking')).toBe('AI가 추천 중이에요');
 	});
 
 	it('picks a time-of-day greeting', () => {

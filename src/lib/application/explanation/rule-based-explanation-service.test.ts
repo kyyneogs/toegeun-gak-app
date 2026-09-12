@@ -62,6 +62,7 @@ function makeResult(routeIds: string[]): RecommendationResult {
 		criterion: 'earliestArrival',
 		mode: 'leaveAfter',
 		alternatives: [],
+		timedRoutes: [],
 		naiveArrivalAt: toIso(arrival)
 	};
 }

@@ -29,6 +29,7 @@ export interface RecommendationResult {
 	criterion: RouteCriterion | 'latestDeparture';
 	mode: RecommendationMode;
 	alternatives: RouteAlternative[];
+	timedRoutes: RecommendedRoute[];
 	naiveArrivalAt: string;
 	calculatedAt: string;
 	liveRoute?: TransitRoute | null;

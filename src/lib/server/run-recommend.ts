@@ -6,6 +6,7 @@ import { TripApplicationService } from '$lib/application/trip/trip-service';
 import { isKakaoRestKeyConfigured } from '$lib/constants/kakao';
 import { serverGtfsDirectory } from '$lib/constants/gtfs-paths';
 import type { RouteCriterion } from '$lib/domain/recommendation/criteria';
+import type { RecommendProgressStage } from '$lib/domain/recommendation/progress';
 import type { RecommendationResult } from '$lib/domain/recommendation/types';
 import {
 	saveRecommendationSnapshot,
@@ -23,6 +24,7 @@ export async function runServerRecommendation(input: {
 	departureFrom: string;
 	desiredArrivalAt?: string;
 	criterion?: RouteCriterion;
+	onProgress?: (stage: RecommendProgressStage) => void;
 }): Promise<RecommendationResult> {
 	const restKey = env.KAKAO_REST_API_KEY?.trim() ?? '';
 	const gtfsDir = serverGtfsDirectory(env.GTFS_DIR);
@@ -55,10 +57,13 @@ export async function runServerRecommendation(input: {
 		departureFrom: fromIso(input.departureFrom),
 		desiredArrivalAt: input.desiredArrivalAt ? fromIso(input.desiredArrivalAt) : undefined
 	});
-	const result = await new RecommendationApplicationService(provider).recommend({
-		trip,
-		criterion: input.criterion
-	});
+	const result = await new RecommendationApplicationService(provider).recommend(
+		{
+			trip,
+			criterion: input.criterion
+		},
+		{ onProgress: input.onProgress }
+	);
 	await saveRecommendationSnapshot(
 		result.id,
 		snapshotFromResult(result, trip.origin.name, trip.destination.name)

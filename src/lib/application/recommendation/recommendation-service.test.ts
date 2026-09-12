@@ -38,8 +38,14 @@ class ScriptedRouteProvider implements RouteProvider {
 		private readonly rateLimit = false
 	) {}
 
-	async findRoutes(): Promise<TransitRoute[]> {
+	async findRoutes(
+		_request?: unknown,
+		options?: { onProgress?: (stage: 'searchingRoutes' | 'routesFound' | 'timingRoutes') => void }
+	): Promise<TransitRoute[]> {
 		this.calls += 1;
+		options?.onProgress?.('searchingRoutes');
+		options?.onProgress?.('routesFound');
+		options?.onProgress?.('timingRoutes');
 
 		if (this.rateLimit) {
 			throw new AppError(ERROR_CODES.ROUTE_PROVIDER_RATE_LIMIT);
@@ -84,6 +90,24 @@ describe('RecommendationApplicationService', () => {
 		expect(result.criterion).toBe('earliestArrival');
 		expect(formatClock(new Date(result.naiveArrivalAt))).toBe('19:20');
 		expect(result.alternatives).toHaveLength(4);
+		expect(result.timedRoutes).toHaveLength(2);
+	});
+
+	it('reports search and timing progress before returning', async () => {
+		const provider = new ScriptedRouteProvider([makeRoute('18:40', 40)]);
+		const stages: string[] = [];
+		const tripService = new TripApplicationService();
+		const trip = await tripService.createTrip({
+			origin: COMPANY_PLACE,
+			destination: GANGNAM_STATION,
+			departureFrom: combineLocalDateAndClock('18:00', DAY),
+			departureUntil: combineLocalDateAndClock('19:00', DAY)
+		});
+		await new RecommendationApplicationService(provider).recommend(
+			{ trip },
+			{ onProgress: (stage) => stages.push(stage) }
+		);
+		expect(stages).toEqual(['searchingRoutes', 'routesFound', 'timingRoutes']);
 	});
 
 	it('calculates headway loss only for the selected route', async () => {

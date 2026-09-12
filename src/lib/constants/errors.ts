@@ -12,7 +12,8 @@ export const ERROR_CODES = {
 	AUTH_CONFLICT: 'AUTH_CONFLICT',
 	AUTH_UNVERIFIED: 'AUTH_UNVERIFIED',
 	AUTH_EMAIL_REQUIRED: 'AUTH_EMAIL_REQUIRED',
-	AUTH_UNAVAILABLE: 'AUTH_UNAVAILABLE'
+	AUTH_UNAVAILABLE: 'AUTH_UNAVAILABLE',
+	AI_UNAVAILABLE: 'AI_UNAVAILABLE'
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
@@ -31,7 +32,8 @@ export const ERROR_USER_MESSAGES: Record<ErrorCode, string> = {
 	AUTH_CONFLICT: '이미 가입된 이메일이에요.',
 	AUTH_UNVERIFIED: '이메일 인증을 마친 뒤 다시 로그인할게요.',
 	AUTH_EMAIL_REQUIRED: '이메일 동의가 필요해요. 카카오에서 이메일을 허용해 주세요.',
-	AUTH_UNAVAILABLE: '지금은 로그인을 쓸 수 없어요. 잠시 후 다시 볼게요.'
+	AUTH_UNAVAILABLE: '지금은 로그인을 쓸 수 없어요. 잠시 후 다시 볼게요.',
+	AI_UNAVAILABLE: '지금은 AI 추천을 쓰지 못해요. 다른 기준을 골라 주세요.'
 };
 
 export const ERROR_DEPARTURE_WINDOW = '끝나는 시간이 시작 시간보다 빨라요.';

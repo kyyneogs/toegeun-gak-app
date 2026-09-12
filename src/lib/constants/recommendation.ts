@@ -1,4 +1,5 @@
-import type { RouteCriterion } from '$lib/domain/recommendation/criteria';
+import type { DisplayCriterion } from '$lib/domain/recommendation/criteria';
+import type { RecommendProgressStage } from '$lib/domain/recommendation/progress';
 import { formatSavedDuration } from '$lib/domain/commit/saved-time';
 import { DEFAULT_STANDUP_LEAD_MINUTES } from '$lib/constants/persist';
 import { accountIdentityCopy } from '$lib/domain/auth/provider';
@@ -49,7 +50,9 @@ export const CRITERION_EARLIEST_ARRIVAL = '빠른 도착';
 export const CRITERION_SHORTEST_DURATION = '짧은 이동';
 export const CRITERION_LEAST_WALKING = '적은 도보';
 export const CRITERION_FEWEST_TRANSFERS = '적은 환승';
+export const CRITERION_AI_PICK = 'AI 추천';
 export const CRITERION_SECTION_LABEL = '다른 기준';
+export const AI_PICK_LOADING_COPY = '길을 고르는 중이에요';
 export const ARRIVE_BY_RESULT_HELPER = '약속에 맞춰 가장 늦게 나가는 길이에요.';
 export const OVERTIME_SECTION_LABEL = '조금 더 있을게요';
 export const OVERTIME_TEN_LABEL = '10분 더';
@@ -95,7 +98,10 @@ export const ACCOUNT_SECTION_LABEL = '계정';
 export const ACCOUNT_GOOGLE_LABEL = 'Google 계정';
 export const ACCOUNT_EMAIL_LABEL = '이메일 계정';
 export const RESULT_LOADING_COPY = '퇴근각을 계산하고 있어요.';
-export const RESULT_LOADING_STEM = '퇴근각을 계산하고 있어';
+export const LOADING_SEARCHING_ROUTES = '경로를 검색 중이에요';
+export const LOADING_ROUTES_FOUND = '경로를 찾았어요';
+export const LOADING_TIMING_ROUTES = '최적 경로를 탐색 중이에요';
+export const LOADING_AI_PICKING = 'AI가 추천 중이에요';
 export const HEADWAY_DELAY_SUPPORT = '집에 늦게 도착해요.';
 export const HEADWAY_LAST_TRAIN_SUPPORT = '막차를 놓칠 수 있어요. 택시는 예상이에요.';
 export const RESULT_ERROR_TITLE = '지금은 추천할 수 없어요';
@@ -165,6 +171,21 @@ export function resultSavedCopy(savedSeconds: number): string {
 	return `이 길을 고르면 ${formatSavedDuration(savedSeconds)} 일찍 도착해요`;
 }
 
+export function calculateLoadingCopy(stage: RecommendProgressStage | null): string {
+	switch (stage) {
+		case 'searchingRoutes':
+			return LOADING_SEARCHING_ROUTES;
+		case 'routesFound':
+			return LOADING_ROUTES_FOUND;
+		case 'timingRoutes':
+			return LOADING_TIMING_ROUTES;
+		case 'aiPicking':
+			return LOADING_AI_PICKING;
+		default:
+			return RESULT_LOADING_COPY;
+	}
+}
+
 export function standupLeadOptionLabel(minutes: number): string {
 	if (minutes === 0) {
 		return PUSH_LEAD_AT_STANDUP_LABEL;
@@ -173,7 +194,7 @@ export function standupLeadOptionLabel(minutes: number): string {
 	return `${minutes}${PUSH_LEAD_BEFORE_SUFFIX}`;
 }
 
-export function criterionLabel(criterion: RouteCriterion | 'latestDeparture'): string {
+export function criterionLabel(criterion: DisplayCriterion): string {
 	switch (criterion) {
 		case 'earliestArrival':
 			return CRITERION_EARLIEST_ARRIVAL;
@@ -183,6 +204,8 @@ export function criterionLabel(criterion: RouteCriterion | 'latestDeparture'): s
 			return CRITERION_LEAST_WALKING;
 		case 'fewestTransfers':
 			return CRITERION_FEWEST_TRANSFERS;
+		case 'aiPick':
+			return CRITERION_AI_PICK;
 		case 'latestDeparture':
 			return ARRIVE_BY_RESULT_HELPER;
 	}

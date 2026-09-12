@@ -37,6 +37,7 @@ npm run dev
 | -------------------------- | -------- | -------------------------------------------------------------------------------------------- |
 | `PUBLIC_KAKAO_JS_KEY`      | 브라우저 | 장소 검색. 없으면 Mock 장소를 씁니다.                                                        |
 | `KAKAO_REST_API_KEY`       | 서버만   | 대중교통 경로. `PUBLIC_` 접두사 금지. 없으면 Mock 경로를 씁니다.                             |
+| `ANTHROPIC_API_KEY`        | 서버만   | Claude AI 추천. `PUBLIC_` 접두사 금지. 없으면 AI 칩은 실패 안내만 보여 줍니다.              |
 | `GTFS_DIR`                 | 로컬만   | 압축 푼 GTFS 폴더. 비우면 `./data/gtfs-seoul-seongnam`. **Vercel에는 넣지 마세요.**          |
 | `DATABASE_URL`             | 서버만   | Postgres. 앱은 트랜잭션 풀러 `:6543`. COPY 적재는 세션 `:5432`. Vercel 필수. `PUBLIC_` 금지. |
 | `PUBLIC_SUPABASE_URL`      | 브라우저 | Auth 프로젝트 URL. `https://xxxx.supabase.co`. 로그인·가입·OAuth에 필요합니다.               |
@@ -51,7 +52,7 @@ npm run dev
 ## 1차 배포 (Vercel + Supabase)
 
 1. Supabase SQL 에디터에 [`sql/schema.sql`](sql/schema.sql)을 **배포 전에** 적용합니다. 앱은 Vercel에서 `CREATE IF NOT EXISTS`를 돌리지 않습니다. 이 파일은 유저 테이블을 지우고 `users.id`를 `auth.users.id`와 맞춥니다. GTFS는 유지합니다.
-2. GitHub 저장소 루트가 이미 앱입니다. Vercel **Root Directory는 비웁니다.** (로컬 폴더 이름이 `dev/`여도 원격에는 `dev/dev`가 없습니다.) Env에 `DATABASE_URL`(트랜잭션 풀러 `:6543`), `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY`, `KAKAO_REST_API_KEY`, `PUBLIC_KAKAO_JS_KEY`, `VAPID_*`, `CRON_SECRET`을 넣습니다. `GTFS_DIR`은 넣지 않습니다. 함수 런타임은 Node 22입니다.
+2. GitHub 저장소 루트가 이미 앱입니다. Vercel **Root Directory는 비웁니다.** (로컬 폴더 이름이 `dev/`여도 원격에는 `dev/dev`가 없습니다.) Env에 `DATABASE_URL`(트랜잭션 풀러 `:6543`), `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY`, `KAKAO_REST_API_KEY`, `ANTHROPIC_API_KEY`, `PUBLIC_KAKAO_JS_KEY`, `VAPID_*`, `CRON_SECRET`을 넣습니다. `GTFS_DIR`은 넣지 않습니다. 함수 런타임은 Node 22입니다.
 3. 로컬에서 피드를 푼 뒤 **서울·성남 슬라이스**만 DB에 올립니다. 전체 `stop_times`를 넣지 마세요.
 
 ```sh
@@ -65,7 +66,7 @@ zip·원본 피드는 git과 Vercel 함수 디스크에 올리지 마세요.
 
 `vercel.json` Cron은 **매일 23:00 UTC**(한국 시간 다음날 08:00)에 `GET /api/cron/standup`을 호출합니다. Hobby는 하루 한 번만 허용해서 1분 간격은 쓰지 않습니다. 헤더는 `Authorization: Bearer ${CRON_SECRET}`입니다.
 
-추천 API `maxDuration`은 Hobby 한도(10초)입니다. 카카오+SQL이 길면 Pro에서 올립니다.
+카카오 경로 검색은 8초, GTFS 시각 맞추기는 12초, AI 추천은 8초로 **단계마다** 끊습니다. `/api/recommend`의 `maxDuration`은 두 경로 단계 합(20초)입니다. Vercel Hobby는 함수 10초 한도가 있어서, 그 플랜이면 Pro로 올리거나 단계가 잘릴 수 있습니다.
 
 ## GTFS
 

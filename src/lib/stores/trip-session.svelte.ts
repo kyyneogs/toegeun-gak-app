@@ -1,12 +1,19 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
+import { fetchAiRoutePick } from '$lib/adapters/http/http-ai-pick';
 import { getAppServices } from '$lib/application/composition';
 import { ERROR_USER_MESSAGES } from '$lib/constants/errors';
-import { DEFAULT_DEPARTURE_FROM, OVERTIME_STEPS_MINUTES } from '$lib/constants/recommendation';
+import {
+	calculateLoadingCopy,
+	DEFAULT_DEPARTURE_FROM,
+	OVERTIME_STEPS_MINUTES
+} from '$lib/constants/recommendation';
 import { STORAGE_KEYS } from '$lib/constants/storage-keys';
 import { toAppError } from '$lib/domain/errors';
 import type { Place } from '$lib/domain/place/place';
-import type { RouteCriterion } from '$lib/domain/recommendation/criteria';
+import type { DisplayCriterion } from '$lib/domain/recommendation/criteria';
+import { displayedRecommendedRoute } from '$lib/domain/recommendation/display-route';
+import type { RecommendProgressStage } from '$lib/domain/recommendation/progress';
 import type {
 	RecommendationExplanation,
 	RecommendationResult,
@@ -23,13 +30,18 @@ class TripSessionStore {
 	departureFromClock = $state(DEFAULT_DEPARTURE_FROM);
 	arriveByEnabled = $state(false);
 	arriveByClock = $state('21:00');
-	selectedCriterion = $state<RouteCriterion | 'latestDeparture'>('earliestArrival');
+	selectedCriterion = $state<DisplayCriterion>('aiPick');
 	status = $state<UiStatus>('idle');
+	loadingStage = $state<RecommendProgressStage | null>(null);
 	errorMessage = $state<string | null>(null);
 	errorCode = $state<string | null>(null);
 	trip = $state<Trip | null>(null);
 	result = $state<RecommendationResult | null>(null);
 	explanation = $state<RecommendationExplanation | null>(null);
+	aiStatus = $state<'idle' | 'loading' | 'ready' | 'error'>('idle');
+	aiReason = $state<string | null>(null);
+	aiRouteIndex = $state<number | null>(null);
+	aiErrorMessage = $state<string | null>(null);
 
 	hydrateFromSettings(): void {
 		this.departureFromClock = settingsStore.defaultDepartureFrom;
@@ -51,23 +63,30 @@ class TripSessionStore {
 		}
 	}
 
+	loadingCopy(): string {
+		return calculateLoadingCopy(this.loadingStage);
+	}
+
 	displayedRecommended(): RecommendedRoute | null {
 		if (!this.result) {
 			return null;
 		}
 
-		if (this.selectedCriterion === this.result.criterion) {
-			return this.result.recommended;
-		}
-
-		const alternative = this.result.alternatives.find(
-			(item) => item.criterion === this.selectedCriterion
-		);
-		return alternative?.route ?? this.result.recommended;
+		return displayedRecommendedRoute(this.result, this.selectedCriterion, this.aiRouteIndex);
 	}
 
-	selectCriterion(criterion: RouteCriterion | 'latestDeparture'): void {
+	selectCriterion(criterion: DisplayCriterion): void {
 		this.selectedCriterion = criterion;
+	}
+
+	async selectAiCriterion(): Promise<void> {
+		this.selectedCriterion = 'aiPick';
+
+		if (this.aiStatus === 'ready' || this.aiStatus === 'loading' || !this.result) {
+			return;
+		}
+
+		await this.loadAiPick(this.result.id);
 	}
 
 	async delayDeparture(minutes: (typeof OVERTIME_STEPS_MINUTES)[number]): Promise<void> {
@@ -102,10 +121,12 @@ class TripSessionStore {
 		}
 
 		this.status = 'calculating';
+		this.loadingStage = 'searchingRoutes';
 		this.errorCode = null;
 		this.errorMessage = null;
 		this.result = null;
 		this.explanation = null;
+		this.clearAiPick();
 		await goto(resolve('/result'));
 
 		try {
@@ -120,7 +141,14 @@ class TripSessionStore {
 				departureFrom,
 				desiredArrivalAt
 			});
-			const result = await services.recommendationService.recommend({ trip });
+			const result = await services.recommendationService.recommend(
+				{ trip },
+				{
+					onProgress: (stage) => {
+						this.loadingStage = stage;
+					}
+				}
+			);
 			const explanation = await services.explanationService.explain(result, {
 				originName: trip.origin.name,
 				destinationName: trip.destination.name
@@ -129,14 +157,18 @@ class TripSessionStore {
 			this.trip = trip;
 			this.result = result;
 			this.explanation = explanation;
-			this.selectedCriterion = result.criterion;
+			this.loadingStage = 'aiPicking';
+			await this.loadAiPick(result.id);
+			this.selectedCriterion = this.aiStatus === 'ready' ? 'aiPick' : result.criterion;
 			this.status = 'result';
+			this.loadingStage = null;
 		} catch (error) {
 			const appError = toAppError(error);
 			console.error('Recommendation failed', { code: appError.code, cause: appError.cause });
 			this.status = 'error';
 			this.errorCode = appError.code;
 			this.errorMessage = appError.message;
+			this.loadingStage = null;
 		}
 	}
 
@@ -147,7 +179,33 @@ class TripSessionStore {
 		this.result = null;
 		this.explanation = null;
 		this.trip = null;
-		this.selectedCriterion = 'earliestArrival';
+		this.selectedCriterion = 'aiPick';
+		this.clearAiPick();
+		this.loadingStage = null;
+	}
+
+	private async loadAiPick(recommendationId: string): Promise<void> {
+		this.aiStatus = 'loading';
+		this.aiErrorMessage = null;
+
+		try {
+			const pick = await fetchAiRoutePick(recommendationId);
+			this.aiRouteIndex = pick.index;
+			this.aiReason = pick.reason;
+			this.aiStatus = 'ready';
+		} catch (error) {
+			const appError = toAppError(error);
+			console.error('AI pick failed', { code: appError.code, cause: appError.cause });
+			this.aiStatus = 'error';
+			this.aiErrorMessage = appError.message;
+		}
+	}
+
+	private clearAiPick(): void {
+		this.aiStatus = 'idle';
+		this.aiReason = null;
+		this.aiRouteIndex = null;
+		this.aiErrorMessage = null;
 	}
 }
 

@@ -65,4 +65,5 @@ export interface RouteRequest {
 
 export interface RouteSearchOptions {
 	maxTransfers?: number;
+	onProgress?: (stage: 'searchingRoutes' | 'routesFound' | 'timingRoutes') => void;
 }

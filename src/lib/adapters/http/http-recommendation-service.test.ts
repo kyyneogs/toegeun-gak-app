@@ -59,6 +59,66 @@ describe('HttpRecommendationService', () => {
 		expect(result.criterion).toBe('earliestArrival');
 	});
 
+	it('reads ndjson progress then the result', async () => {
+		const trip = await new TripApplicationService().createTrip({
+			origin: COMPANY_PLACE,
+			destination: GANGNAM_STATION,
+			departureFrom: combineLocalDateAndClock('18:00', DAY)
+		});
+		const stages: string[] = [];
+		const fetchImpl: typeof fetch = async () =>
+			new Response(
+				[
+					JSON.stringify({ type: 'progress', stage: 'searchingRoutes' }),
+					JSON.stringify({ type: 'progress', stage: 'routesFound' }),
+					JSON.stringify({ type: 'progress', stage: 'timingRoutes' }),
+					JSON.stringify({
+						type: 'result',
+						result: {
+							id: 'rec_stream',
+							tripId: trip.id,
+							recommended: {
+								departureAt: trip.departureFrom,
+								expectedArrivalAt: trip.departureFrom,
+								totalTimeSeconds: 60,
+								waitingTimeSeconds: 0,
+								walkingTimeSeconds: 0,
+								transferCount: 0,
+								route: {
+									provider: 'gtfs',
+									routeId: 'r1',
+									totalTimeSeconds: 60,
+									movingTimeSeconds: 60,
+									waitingTimeSeconds: 0,
+									walkingTimeSeconds: 0,
+									transferCount: 0,
+									departureAt: trip.departureFrom,
+									arrivalAt: trip.departureFrom,
+									sections: []
+								},
+								chosenTrips: [],
+								headwayLoss: null
+							},
+							criterion: 'earliestArrival',
+							mode: 'leaveAfter',
+							alternatives: [],
+							timedRoutes: [],
+							naiveArrivalAt: trip.departureFrom,
+							calculatedAt: trip.createdAt
+						}
+					})
+				].join('\n'),
+				{ status: 200, headers: { 'Content-Type': 'application/x-ndjson' } }
+			);
+
+		const result = await new HttpRecommendationService(fetchImpl).recommend(
+			{ trip },
+			{ onProgress: (stage) => stages.push(stage) }
+		);
+		expect(result.id).toBe('rec_stream');
+		expect(stages).toEqual(['searchingRoutes', 'routesFound', 'timingRoutes']);
+	});
+
 	it('maps a missed arrive-by to RECOMMENDATION_UNAVAILABLE', async () => {
 		const trip = await new TripApplicationService().createTrip({
 			origin: COMPANY_PLACE,

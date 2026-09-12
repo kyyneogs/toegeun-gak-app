@@ -17,7 +17,7 @@ import type {
 	RouteAlternative
 } from '$lib/domain/recommendation/types';
 import type { TransitRoute } from '$lib/domain/route/route';
-import type { RecommendationService } from '$lib/ports/recommendation-service';
+import type { RecommendOptions, RecommendationService } from '$lib/ports/recommendation-service';
 import type { RouteProvider } from '$lib/ports/route-provider';
 import { createId } from '$lib/utils/id';
 import { fromIso, toIso } from '$lib/utils/time';
@@ -25,9 +25,12 @@ import { fromIso, toIso } from '$lib/utils/time';
 export class RecommendationApplicationService implements RecommendationService {
 	constructor(private readonly routeProvider: RouteProvider) {}
 
-	async recommend(input: RecommendationInput): Promise<RecommendationResult> {
+	async recommend(
+		input: RecommendationInput,
+		options?: RecommendOptions
+	): Promise<RecommendationResult> {
 		const departureAfter = fromIso(input.trip.departureFrom);
-		const routes = await this.loadTimedRoutes(input, departureAfter);
+		const routes = await this.loadTimedRoutes(input, departureAfter, options);
 		const desiredArrivalAt = input.trip.desiredArrivalAt
 			? fromIso(input.trip.desiredArrivalAt)
 			: null;
@@ -60,6 +63,7 @@ export class RecommendationApplicationService implements RecommendationService {
 			criterion,
 			mode,
 			alternatives: toAlternatives(candidates),
+			timedRoutes: candidates.map(toRecommendedRoute),
 			naiveArrivalAt: latestArrivalAt(candidates) ?? winner.arrivalAt,
 			calculatedAt: toIso(new Date()),
 			scheduleSource: winner.scheduleSource
@@ -68,13 +72,19 @@ export class RecommendationApplicationService implements RecommendationService {
 
 	private async loadTimedRoutes(
 		input: RecommendationInput,
-		departureAt: Date
+		departureAt: Date,
+		options?: RecommendOptions
 	): Promise<TransitRoute[]> {
 		try {
-			return await this.routeProvider.findRoutes({
-				...tripPoints(input),
-				departureAt
-			});
+			return await this.routeProvider.findRoutes(
+				{
+					...tripPoints(input),
+					departureAt
+				},
+				{
+					onProgress: (stage) => options?.onProgress?.(stage)
+				}
+			);
 		} catch (cause) {
 			if (isAppError(cause)) {
 				throw cause;

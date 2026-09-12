@@ -5,7 +5,9 @@
 		ELLIPSIS_MAX_DOTS,
 		prefersReducedMotion
 	} from '$lib/constants/motion';
-	import { RESULT_LOADING_COPY, RESULT_LOADING_STEM } from '$lib/constants/recommendation';
+	import { RESULT_LOADING_COPY } from '$lib/constants/recommendation';
+
+	let { message = RESULT_LOADING_COPY }: { message?: string } = $props();
 
 	let dotCount = $state(ELLIPSIS_MAX_DOTS);
 	let reduced = $state(false);
@@ -31,9 +33,9 @@
 
 <p class="status-copy loading">
 	{#if reduced}
-		{RESULT_LOADING_COPY}
+		{message}
 	{:else}
-		{RESULT_LOADING_STEM}요{dots}
+		{message}{dots}
 	{/if}
 </p>
 

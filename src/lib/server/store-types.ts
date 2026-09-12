@@ -36,9 +36,21 @@ export interface RecommendationSnapshotRoute {
 	arrivalAt: string;
 }
 
+export interface RecommendationSnapshotAiCandidate {
+	index: number;
+	departureAt: string;
+	arrivalAt: string;
+	totalTimeSeconds: number;
+	walkingTimeSeconds: number;
+	transferCount: number;
+	lineLabel: string;
+}
+
 export interface RecommendationSnapshotPayload {
 	naiveArrivalAt: string;
 	originName: string;
 	destinationName: string;
+	mode?: 'leaveAfter' | 'arriveBy';
 	routes: RecommendationSnapshotRoute[];
+	aiCandidates?: RecommendationSnapshotAiCandidate[];
 }

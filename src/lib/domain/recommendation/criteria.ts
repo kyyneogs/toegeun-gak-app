@@ -10,6 +10,16 @@ export const ROUTE_CRITERIA = [
 
 export type RouteCriterion = (typeof ROUTE_CRITERIA)[number];
 
+export const AI_PICK_CRITERION = 'aiPick' as const;
+
+export type AiPickCriterion = typeof AI_PICK_CRITERION;
+
+export const RESULT_CHIP_CRITERIA = [AI_PICK_CRITERION, ...ROUTE_CRITERIA] as const;
+
+export type ResultChipCriterion = (typeof RESULT_CHIP_CRITERIA)[number];
+
+export type DisplayCriterion = RouteCriterion | AiPickCriterion | 'latestDeparture';
+
 export type RecommendationMode = 'leaveAfter' | 'arriveBy';
 
 export function isRouteCriterion(value: string): value is RouteCriterion {

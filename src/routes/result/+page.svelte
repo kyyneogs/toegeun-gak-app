@@ -12,6 +12,7 @@
 		COMMIT_NEED_ACCOUNT,
 		PUSH_IOS_HINT,
 		CRITERION_SECTION_LABEL,
+		AI_PICK_LOADING_COPY,
 		OVERTIME_SECTION_LABEL,
 		OVERTIME_TEN_LABEL,
 		OVERTIME_THIRTY_LABEL,
@@ -29,7 +30,10 @@
 		resultSavedCopy
 	} from '$lib/constants/recommendation';
 	import { savedArrivalSeconds } from '$lib/domain/commit/saved-time';
-	import { ROUTE_CRITERIA, type RouteCriterion } from '$lib/domain/recommendation/criteria';
+	import {
+		RESULT_CHIP_CRITERIA,
+		type ResultChipCriterion
+	} from '$lib/domain/recommendation/criteria';
 	import { sessionStore } from '$lib/stores/session.svelte';
 	import { tripSession } from '$lib/stores/trip-session.svelte';
 	import { standUpStartsWithWalk, transitLineLabel } from '$lib/utils/route-label';
@@ -50,7 +54,12 @@
 		}
 	});
 
-	function chooseCriterion(criterion: RouteCriterion): void {
+	function chooseCriterion(criterion: ResultChipCriterion): void {
+		if (criterion === 'aiPick') {
+			void tripSession.selectAiCriterion();
+			return;
+		}
+
 		tripSession.selectCriterion(criterion);
 	}
 
@@ -66,7 +75,7 @@
 </header>
 
 {#if tripSession.status === 'calculating'}
-	<LoadingStatus />
+	<LoadingStatus message={tripSession.loadingCopy()} />
 	<SkeletonBlock lines={4} />
 {:else if tripSession.status === 'error'}
 	<div class="error-block">
@@ -90,6 +99,15 @@
 			<p class="helper predicted-copy">{savedCopy}</p>
 		{/if}
 		<p class="helper predicted-copy">{scheduleRouteCopy(tripSession.result.scheduleSource)}</p>
+		{#if tripSession.selectedCriterion === 'aiPick' && tripSession.aiStatus === 'loading'}
+			<p class="helper predicted-copy">{AI_PICK_LOADING_COPY}</p>
+		{/if}
+		{#if tripSession.selectedCriterion === 'aiPick' && tripSession.aiStatus === 'ready' && tripSession.aiReason}
+			<p class="helper predicted-copy">{tripSession.aiReason}</p>
+		{/if}
+		{#if tripSession.selectedCriterion === 'aiPick' && tripSession.aiStatus === 'error' && tripSession.aiErrorMessage}
+			<p class="helper predicted-copy">{tripSession.aiErrorMessage}</p>
+		{/if}
 		{#if tripSession.result.mode === 'arriveBy' && tripSession.selectedCriterion === 'latestDeparture'}
 			<p class="helper predicted-copy">{ARRIVE_BY_RESULT_HELPER}</p>
 		{/if}
@@ -119,11 +137,12 @@
 		<section class="criteria">
 			<p class="section-label">{CRITERION_SECTION_LABEL}</p>
 			<div class="chip-row">
-				{#each ROUTE_CRITERIA as criterion (criterion)}
+				{#each RESULT_CHIP_CRITERIA as criterion (criterion)}
 					<button
 						class="chip"
 						class:active={tripSession.selectedCriterion === criterion}
 						type="button"
+						disabled={criterion === 'aiPick' && tripSession.aiStatus === 'loading'}
 						onclick={() => chooseCriterion(criterion)}
 					>
 						{criterionLabel(criterion)}
@@ -266,5 +285,9 @@
 		background: var(--color-accent);
 		border-color: var(--color-accent);
 		color: #fff;
+	}
+
+	.chip:disabled {
+		opacity: 0.6;
 	}
 </style>

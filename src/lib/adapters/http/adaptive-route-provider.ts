@@ -1,4 +1,4 @@
-import type { RouteRequest, TransitRoute } from '$lib/domain/route/route';
+import type { RouteRequest, RouteSearchOptions, TransitRoute } from '$lib/domain/route/route';
 import type { TransitConfiguredStatus } from '$lib/ports/route-connection';
 import type { RouteProvider } from '$lib/ports/route-provider';
 
@@ -11,9 +11,9 @@ export class AdaptiveRouteProvider implements RouteProvider {
 		private readonly readStatus: () => Promise<TransitConfiguredStatus>
 	) {}
 
-	async findRoutes(request: RouteRequest): Promise<TransitRoute[]> {
+	async findRoutes(request: RouteRequest, options?: RouteSearchOptions): Promise<TransitRoute[]> {
 		const provider = await this.resolve();
-		return provider.findRoutes(request);
+		return provider.findRoutes(request, options);
 	}
 
 	async findLiveRoute(

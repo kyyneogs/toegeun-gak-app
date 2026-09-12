@@ -1,4 +1,5 @@
 import {
+	RESULT_CHIP_CRITERIA,
 	alternativesFor,
 	filterArrivingBy,
 	latestArrivalAt,
@@ -100,5 +101,10 @@ describe('route criteria', () => {
 		const alternatives = alternativesFor(routes);
 		expect(alternatives).toHaveLength(4);
 		expect(alternatives[0]?.criterion).toBe('earliestArrival');
+	});
+
+	it('puts AI pick first among result chips, not in rule alternatives', () => {
+		expect(RESULT_CHIP_CRITERIA[0]).toBe('aiPick');
+		expect(alternativesFor(routes)).toHaveLength(4);
 	});
 });

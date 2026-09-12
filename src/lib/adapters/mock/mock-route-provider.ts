@@ -13,6 +13,7 @@ import { nextBusAt } from '$lib/domain/route/headway';
 import type {
 	HeadwayLoss,
 	RouteRequest,
+	RouteSearchOptions,
 	RouteSection,
 	TransitRoute
 } from '$lib/domain/route/route';
@@ -68,8 +69,11 @@ export class MockRouteProvider implements RouteProvider {
 		this.routeName = options.routeName ?? MOCK_ROUTE_NAME;
 	}
 
-	async findRoutes(request: RouteRequest): Promise<TransitRoute[]> {
+	async findRoutes(request: RouteRequest, options?: RouteSearchOptions): Promise<TransitRoute[]> {
+		options?.onProgress?.('searchingRoutes');
 		await wait(this.delayMs);
+		options?.onProgress?.('routesFound');
+		options?.onProgress?.('timingRoutes');
 
 		const leaveAt = request.departureAt;
 		const arriveAtStop = addMinutes(leaveAt, this.walkToStopMinutes);

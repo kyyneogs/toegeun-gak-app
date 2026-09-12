@@ -1,8 +1,11 @@
 import { json } from '@sveltejs/kit';
 import { parseRecommendRequest } from '$lib/adapters/http/recommend-request';
+import {
+	encodeRecommendStreamEvent,
+	recommendErrorEvent
+} from '$lib/adapters/http/recommend-stream';
 import { ERROR_CODES, ERROR_USER_MESSAGES } from '$lib/constants/errors';
 import { RECOMMEND_MAX_DURATION_SECONDS } from '$lib/constants/persist';
-import { isAppError } from '$lib/domain/errors';
 import { runServerRecommendation } from '$lib/server/run-recommend';
 
 export const config = {
@@ -38,60 +41,40 @@ export async function POST({ request }) {
 		);
 	}
 
-	try {
-		const result = await runServerRecommendation({
-			originName: parsed.origin.name,
-			originLatitude: parsed.origin.latitude,
-			originLongitude: parsed.origin.longitude,
-			destinationName: parsed.destination.name,
-			destinationLatitude: parsed.destination.latitude,
-			destinationLongitude: parsed.destination.longitude,
-			departureFrom: parsed.departureFrom,
-			desiredArrivalAt: parsed.desiredArrivalAt,
-			criterion: parsed.criterion
-		});
-		return json(result);
-	} catch (cause) {
-		console.error('Recommend failed', cause);
+	const encoder = new TextEncoder();
+	const stream = new ReadableStream<Uint8Array>({
+		async start(controller) {
+			const send = (event: Parameters<typeof encodeRecommendStreamEvent>[0]) => {
+				controller.enqueue(encoder.encode(encodeRecommendStreamEvent(event)));
+			};
 
-		if (isAppError(cause) && cause.code === ERROR_CODES.ROUTE_PROVIDER_RATE_LIMIT) {
-			return json(
-				{
-					code: cause.code,
-					message: ERROR_USER_MESSAGES.ROUTE_PROVIDER_RATE_LIMIT
-				},
-				{ status: 429 }
-			);
+			try {
+				const result = await runServerRecommendation({
+					originName: parsed.origin.name,
+					originLatitude: parsed.origin.latitude,
+					originLongitude: parsed.origin.longitude,
+					destinationName: parsed.destination.name,
+					destinationLatitude: parsed.destination.latitude,
+					destinationLongitude: parsed.destination.longitude,
+					departureFrom: parsed.departureFrom,
+					desiredArrivalAt: parsed.desiredArrivalAt,
+					criterion: parsed.criterion,
+					onProgress: (stage) => send({ type: 'progress', stage })
+				});
+				send({ type: 'result', result });
+			} catch (cause) {
+				console.error('Recommend failed', cause);
+				send(recommendErrorEvent(cause));
+			} finally {
+				controller.close();
+			}
 		}
+	});
 
-		if (isAppError(cause) && cause.code === ERROR_CODES.RECOMMENDATION_UNAVAILABLE) {
-			return json(
-				{
-					code: cause.code,
-					message: cause.message
-				},
-				{ status: 404 }
-			);
+	return new Response(stream, {
+		headers: {
+			'Content-Type': 'application/x-ndjson; charset=utf-8',
+			'Cache-Control': 'no-cache'
 		}
-
-		if (isAppError(cause) && cause.code === ERROR_CODES.ROUTE_NOT_FOUND) {
-			return json(
-				{
-					code: cause.code,
-					message: cause.message
-				},
-				{ status: 404 }
-			);
-		}
-
-		const code = isAppError(cause) ? cause.code : ERROR_CODES.ROUTE_PROVIDER_TIMEOUT;
-
-		return json(
-			{
-				code,
-				message: ERROR_USER_MESSAGES[code] ?? ERROR_USER_MESSAGES.ROUTE_PROVIDER_TIMEOUT
-			},
-			{ status: 502 }
-		);
-	}
+	});
 }
