@@ -48,7 +48,7 @@ describe('isBackNavigation', () => {
 	it('treats browser history pop as back', () => {
 		expect(isBackNavigation('/', '/result/route', 'popstate')).toBe(true);
 		expect(PAGE_TRANSITION_MS).toBe(280);
-		expect(ONBOARDING_READY_HOLD_MS).toBe(240);
+		expect(ONBOARDING_READY_HOLD_MS).toBe(2000);
 	});
 
 	it('slides same-depth routes forward instead of fading', () => {

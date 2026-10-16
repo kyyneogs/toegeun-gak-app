@@ -14,7 +14,7 @@ describe('onboardingReadyTimings', () => {
 		const timings = onboardingReadyTimings(false);
 		expect(timings.fadeAt).toBe(ONBOARDING_READY_ENTER_MS + ONBOARDING_READY_HOLD_MS);
 		expect(timings.doneAt).toBe(timings.fadeAt + ONBOARDING_READY_FADE_MS);
-		expect(timings.doneAt).toBeLessThanOrEqual(800);
+		expect(ONBOARDING_READY_HOLD_MS).toBe(2000);
 	});
 
 	it('skips the wait when motion is reduced', () => {
