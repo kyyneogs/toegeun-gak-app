@@ -1,6 +1,7 @@
 import { ERROR_CODES } from '$lib/constants/errors';
 import { AppError } from '$lib/domain/errors';
 import { candidateAtIndex, type AiPickChoice } from '$lib/domain/recommendation/ai-candidates';
+import type { OriginWeather } from '$lib/domain/weather/origin-weather';
 import type { AiRoutePicker } from '$lib/ports/ai-route-picker';
 import {
 	loadRecommendationSnapshot,
@@ -10,7 +11,8 @@ import {
 
 export async function pickAiRecommendation(
 	recommendationId: string,
-	picker: AiRoutePicker
+	picker: AiRoutePicker,
+	lookupWeather?: (latitude: number, longitude: number) => Promise<OriginWeather>
 ): Promise<AiPickChoice> {
 	if (!recommendationId.trim()) {
 		throw new AppError(ERROR_CODES.INVALID_REQUEST);
@@ -26,7 +28,8 @@ export async function pickAiRecommendation(
 		originName: snapshot.originName,
 		destinationName: snapshot.destinationName,
 		mode: snapshot.mode === 'arriveBy' ? 'arriveBy' : 'leaveAfter',
-		candidates: snapshot.aiCandidates
+		candidates: snapshot.aiCandidates,
+		weather: await originWeatherForSnapshot(snapshot, lookupWeather)
 	});
 	const candidate = candidateAtIndex(snapshot.aiCandidates, choice.index);
 
@@ -41,4 +44,24 @@ export async function pickAiRecommendation(
 		index: choice.index,
 		reason: choice.reason.trim()
 	};
+}
+
+async function originWeatherForSnapshot(
+	snapshot: { originLatitude?: number; originLongitude?: number },
+	lookupWeather?: (latitude: number, longitude: number) => Promise<OriginWeather>
+): Promise<OriginWeather | null> {
+	if (
+		!lookupWeather ||
+		typeof snapshot.originLatitude !== 'number' ||
+		typeof snapshot.originLongitude !== 'number'
+	) {
+		return null;
+	}
+
+	try {
+		return await lookupWeather(snapshot.originLatitude, snapshot.originLongitude);
+	} catch (cause) {
+		console.error('origin weather lookup failed', cause);
+		return null;
+	}
 }

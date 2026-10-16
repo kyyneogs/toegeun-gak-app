@@ -1,5 +1,6 @@
 import type { RecommendationMode } from '$lib/domain/recommendation/criteria';
 import type { RecommendedRoute } from '$lib/domain/recommendation/types';
+import type { OriginWeather } from '$lib/domain/weather/origin-weather';
 import { transitLineLabel } from '$lib/utils/route-label';
 
 export interface AiCandidateSummary {
@@ -17,6 +18,7 @@ export interface AiPickContext {
 	destinationName: string;
 	mode: RecommendationMode;
 	candidates: AiCandidateSummary[];
+	weather?: OriginWeather | null;
 }
 
 export interface AiPickChoice {
@@ -63,15 +65,22 @@ export function buildAiPickPrompt(context: AiPickContext): string {
 		].join(', ');
 	});
 
+	const weatherLine = context.weather ? weatherPromptLine(context.weather) : null;
+
 	return [
 		'퇴근 경로 후보 중에서 지금 가장 나은 하나를 고르세요.',
 		`출발지: ${context.originName}`,
 		`도착지: ${context.destinationName}`,
 		modeLine,
+		...(weatherLine ? [weatherLine] : []),
 		'시각과 분 숫자는 다시 말하지 마세요. 앱이 보여 줍니다.',
 		'index는 아래 목록에 있는 값만 쓰세요.',
 		'이유는 해요체로 한 문장만 쓰세요.',
 		'후보:',
 		...lines
 	].join('\n');
+}
+
+export function weatherPromptLine(weather: OriginWeather): string {
+	return `출발지 현재 날씨: ${weather.summary}, ${weather.temperatureC}°C, 강수 ${weather.precipitationMm}mm. 비나 눈이면 도보와 환승이 적은 후보를 우선하세요.`;
 }

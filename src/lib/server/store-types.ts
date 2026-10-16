@@ -62,6 +62,8 @@ export interface RecommendationSnapshotPayload {
 	naiveArrivalAt: string;
 	originName: string;
 	destinationName: string;
+	originLatitude?: number;
+	originLongitude?: number;
 	mode?: 'leaveAfter' | 'arriveBy';
 	routes: RecommendationSnapshotRoute[];
 	aiCandidates?: RecommendationSnapshotAiCandidate[];

@@ -1,6 +1,7 @@
 import { env } from '$env/dynamic/private';
 import { ERROR_CODES } from '$lib/constants/errors';
 import { ClaudeAiRoutePicker } from '$lib/adapters/anthropic/claude-ai-route-picker';
+import { fetchOriginWeather } from '$lib/adapters/weather/open-meteo-weather';
 import { pickAiRecommendation } from '$lib/application/recommendation/ai-recommendation-service';
 import { AppError } from '$lib/domain/errors';
 import type { AiPickChoice } from '$lib/domain/recommendation/ai-candidates';
@@ -10,7 +11,7 @@ export async function runServerAiRecommendation(
 	recommendationId: string,
 	picker: AiRoutePicker = createClaudePicker()
 ): Promise<AiPickChoice> {
-	return pickAiRecommendation(recommendationId, picker);
+	return pickAiRecommendation(recommendationId, picker, fetchOriginWeather);
 }
 
 function createClaudePicker(): AiRoutePicker {

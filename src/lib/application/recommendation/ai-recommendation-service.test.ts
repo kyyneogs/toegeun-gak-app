@@ -95,6 +95,49 @@ describe('pickAiRecommendation', () => {
 		}
 	});
 
+	it('picks without weather when the lookup fails', async () => {
+		const result = makeResult();
+		await saveRecommendationSnapshot(
+			'rec_ai',
+			snapshotFromResult(result, '모란', '잠실', { latitude: 37.43, longitude: 127.13 })
+		);
+		let weather: unknown = 'unset';
+		const pick = await pickAiRecommendation(
+			'rec_ai',
+			{
+				pick: async (context) => {
+					weather = context.weather;
+					return { index: 0, reason: '환승이 없어서 이 길이 나아요.' };
+				}
+			},
+			async () => {
+				throw new Error('meteo down');
+			}
+		);
+		expect(pick.index).toBe(0);
+		expect(weather).toBeNull();
+	});
+
+	it('passes the origin weather into the picker', async () => {
+		const result = makeResult();
+		await saveRecommendationSnapshot(
+			'rec_ai',
+			snapshotFromResult(result, '모란', '잠실', { latitude: 37.43, longitude: 127.13 })
+		);
+		let summary = '';
+		await pickAiRecommendation(
+			'rec_ai',
+			{
+				pick: async (context) => {
+					summary = context.weather?.summary ?? '';
+					return { index: 0, reason: '비가 와서 도보가 짧은 길이 나아요.' };
+				}
+			},
+			async () => ({ summary: '비', temperatureC: 18, precipitationMm: 1.2 })
+		);
+		expect(summary).toBe('비');
+	});
+
 	it('rejects an out-of-range model index', async () => {
 		const result = makeResult();
 		await saveRecommendationSnapshot('rec_ai', snapshotFromResult(result, '모란', '잠실'));

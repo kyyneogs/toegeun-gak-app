@@ -13,7 +13,8 @@ import { addMinutes, toIso } from '$lib/utils/time';
 export function snapshotFromResult(
 	result: RecommendationResult,
 	originName: string,
-	destinationName: string
+	destinationName: string,
+	origin?: { latitude: number; longitude: number }
 ): RecommendationSnapshotPayload {
 	const routes = [
 		{
@@ -32,6 +33,8 @@ export function snapshotFromResult(
 		naiveArrivalAt: result.naiveArrivalAt,
 		originName,
 		destinationName,
+		originLatitude: origin?.latitude,
+		originLongitude: origin?.longitude,
 		mode: result.mode,
 		routes,
 		aiCandidates: summariesFromTimedRoutes(result.timedRoutes)

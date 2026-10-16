@@ -66,7 +66,10 @@ export async function runServerRecommendation(input: {
 	);
 	await saveRecommendationSnapshot(
 		result.id,
-		snapshotFromResult(result, trip.origin.name, trip.destination.name)
+		snapshotFromResult(result, trip.origin.name, trip.destination.name, {
+			latitude: trip.origin.latitude,
+			longitude: trip.origin.longitude
+		})
 	);
 	return result;
 }

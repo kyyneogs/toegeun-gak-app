@@ -13,6 +13,7 @@ import { toAppError } from '$lib/domain/errors';
 import type { Place } from '$lib/domain/place/place';
 import type { DisplayCriterion } from '$lib/domain/recommendation/criteria';
 import { displayedRecommendedRoute } from '$lib/domain/recommendation/display-route';
+import { routeUsesPremiumTransit } from '$lib/domain/route/premium-route';
 import type { RecommendProgressStage } from '$lib/domain/recommendation/progress';
 import type {
 	RecommendationExplanation,
@@ -42,6 +43,7 @@ class TripSessionStore {
 	aiReason = $state<string | null>(null);
 	aiRouteIndex = $state<number | null>(null);
 	aiErrorMessage = $state<string | null>(null);
+	excludePremiumRoutes = $state(false);
 
 	hydrateFromSettings(): void {
 		this.departureFromClock = settingsStore.defaultDepartureFrom;
@@ -72,7 +74,29 @@ class TripSessionStore {
 			return null;
 		}
 
-		return displayedRecommendedRoute(this.result, this.selectedCriterion, this.aiRouteIndex);
+		return displayedRecommendedRoute(
+			this.result,
+			this.selectedCriterion,
+			this.aiRouteIndex,
+			this.excludePremiumRoutes
+		);
+	}
+
+	toggleExcludePremiumRoutes(): void {
+		this.excludePremiumRoutes = !this.excludePremiumRoutes;
+
+		if (!this.excludePremiumRoutes || !this.result || this.selectedCriterion !== 'aiPick') {
+			return;
+		}
+
+		const aiRoute = this.aiRouteIndex === null ? null : this.result.timedRoutes[this.aiRouteIndex];
+
+		if (!aiRoute || !routeUsesPremiumTransit(aiRoute.route)) {
+			return;
+		}
+
+		this.selectedCriterion =
+			this.result.criterion === 'latestDeparture' ? 'earliestArrival' : this.result.criterion;
 	}
 
 	selectCriterion(criterion: DisplayCriterion): void {

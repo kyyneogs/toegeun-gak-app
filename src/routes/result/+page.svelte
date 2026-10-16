@@ -18,6 +18,9 @@
 		STANDUP_REPLACE_CTA,
 		STANDUP_VIEW_LINK,
 		CRITERION_SECTION_LABEL,
+		PREMIUM_EXCLUDE_HELPER,
+		PREMIUM_EXCLUDE_LABEL,
+		PREMIUM_EXCLUDED_EMPTY,
 		AI_PICK_LOADING_COPY,
 		OVERTIME_SECTION_LABEL,
 		OVERTIME_TEN_LABEL,
@@ -80,6 +83,38 @@
 	<span></span>
 </header>
 
+{#snippet routeCriteria()}
+	<section class="criteria">
+		<p class="section-label">{CRITERION_SECTION_LABEL}</p>
+		<div class="chip-row">
+			{#each RESULT_CHIP_CRITERIA as criterion (criterion)}
+				<button
+					class="chip"
+					class:active={tripSession.selectedCriterion === criterion}
+					type="button"
+					aria-pressed={tripSession.selectedCriterion === criterion}
+					disabled={criterion === 'aiPick' && tripSession.aiStatus === 'loading'}
+					onclick={() => chooseCriterion(criterion)}
+				>
+					{criterionLabel(criterion)}
+				</button>
+			{/each}
+			<button
+				class="chip"
+				class:active={tripSession.excludePremiumRoutes}
+				type="button"
+				aria-pressed={tripSession.excludePremiumRoutes}
+				onclick={() => tripSession.toggleExcludePremiumRoutes()}
+			>
+				{PREMIUM_EXCLUDE_LABEL}
+			</button>
+		</div>
+		{#if tripSession.excludePremiumRoutes}
+			<p class="helper">{PREMIUM_EXCLUDE_HELPER}</p>
+		{/if}
+	</section>
+{/snippet}
+
 {#if tripSession.status === 'calculating'}
 	<LoadingStatus message={tripSession.loadingCopy()} />
 	<SkeletonBlock />
@@ -91,6 +126,9 @@
 			>{RESULT_RETRY_CTA}</button
 		>
 	</div>
+{:else if tripSession.result && tripSession.trip && tripSession.excludePremiumRoutes && !recommended}
+	<p class="large-title error-title">{PREMIUM_EXCLUDED_EMPTY}</p>
+	{@render routeCriteria()}
 {:else if recommended && tripSession.result && tripSession.trip}
 	{@const recommendedLine = transitLineLabel(recommended.route.sections)}
 	{@const standUpWalk = standUpStartsWithWalk(recommended.route.sections)}
@@ -188,23 +226,7 @@
 			{/if}
 		</div>
 
-		<section class="criteria">
-			<p class="section-label">{CRITERION_SECTION_LABEL}</p>
-			<div class="chip-row">
-				{#each RESULT_CHIP_CRITERIA as criterion (criterion)}
-					<button
-						class="chip"
-						class:active={tripSession.selectedCriterion === criterion}
-						type="button"
-						aria-pressed={tripSession.selectedCriterion === criterion}
-						disabled={criterion === 'aiPick' && tripSession.aiStatus === 'loading'}
-						onclick={() => chooseCriterion(criterion)}
-					>
-						{criterionLabel(criterion)}
-					</button>
-				{/each}
-			</div>
-		</section>
+		{@render routeCriteria()}
 
 		<section class="overtime">
 			<p class="section-label">{OVERTIME_SECTION_LABEL}</p>

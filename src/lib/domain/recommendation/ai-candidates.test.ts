@@ -1,5 +1,6 @@
 import {
 	buildAiPickPrompt,
+	weatherPromptLine,
 	candidateAtIndex,
 	summariesFromTimedRoutes
 } from '$lib/domain/recommendation/ai-candidates';
@@ -94,6 +95,20 @@ describe('ai candidate summaries', () => {
 		expect(prompt).toContain('index 0');
 		expect(prompt).toContain('해요체');
 		expect(prompt).not.toContain('chosenTrips');
+		expect(prompt).not.toContain('현재 날씨');
+	});
+
+	it('tells Claude to prefer less walking when it is raining', () => {
+		const line = weatherPromptLine({ summary: '비', temperatureC: 18, precipitationMm: 1.2 });
+		const prompt = buildAiPickPrompt({
+			originName: '모란',
+			destinationName: '잠실',
+			mode: 'leaveAfter',
+			weather: { summary: '비', temperatureC: 18, precipitationMm: 1.2 },
+			candidates: summariesFromTimedRoutes([makeRoute('fast', 480)])
+		});
+		expect(line).toContain('비나 눈이면');
+		expect(prompt).toContain(line);
 	});
 });
 

@@ -2,6 +2,8 @@ import {
 	accountIdentityLabel,
 	HEADWAY_LOSS_TITLE,
 	HOME_CTA_LABEL,
+	PREMIUM_EXCLUDE_LABEL,
+	PREMIUM_EXCLUDED_EMPTY,
 	NAV_BACK,
 	COMMIT_LOGIN_CTA,
 	PUSH_DEVICE_UNAVAILABLE,
@@ -35,6 +37,8 @@ describe('recommendation copy', () => {
 		expect(HEADWAY_LOSS_TITLE).toBe('1분만 늦으면요');
 		expect(HOME_CTA_LABEL).toBe('퇴근각 볼게요');
 		expect(COMMIT_LOGIN_CTA).toBe('로그인하고 맞출게요');
+		expect(PREMIUM_EXCLUDE_LABEL).toBe('비싼 노선 빼기');
+		expect(PREMIUM_EXCLUDED_EMPTY).toBe('이 조건으로는 추천할 수 없어요.');
 		expect(NAV_BACK).toBe('뒤로');
 	});
 

@@ -7,6 +7,7 @@ export const SEOUL_TIME_ZONE = 'Asia/Seoul';
 export const ROUTE_SEARCH_TIMEOUT_MS = 8_000;
 export const ROUTE_TIMING_TIMEOUT_MS = 12_000;
 export const AI_PICK_TIMEOUT_MS = 8_000;
+export const WEATHER_LOOKUP_TIMEOUT_MS = 1_500;
 export const RECOMMEND_MAX_DURATION_SECONDS = Math.ceil(
 	(ROUTE_SEARCH_TIMEOUT_MS + ROUTE_TIMING_TIMEOUT_MS) / 1000
 );
